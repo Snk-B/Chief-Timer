@@ -498,8 +498,9 @@ private fun TimerCard(timer: DashboardTimer) {
             )
             if (row.kind != RowKind.IDLE) {
                 LinearWavyProgressIndicator(
-                    progress = { row.progress.coerceIn(0f, 1f) },
+                    progress = { maxOf(0.015f, row.progress.coerceIn(0f, 1f)) },
                     modifier = Modifier.fillMaxWidth(),
+                    amplitude = { 1f },
                 )
                 Text(stringResource(R.string.percent_complete, (row.progress.coerceIn(0f, 1f) * 100).toInt()), style = MaterialTheme.typography.bodySmall)
             }
