@@ -12,7 +12,7 @@
 <div align="center">
 
 [![Download APK](https://img.shields.io/badge/Download-APK%20v1.0.0-E040FB?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Snk-B/Chief-Timer/releases/latest)
-[![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
+[![Android 8.0+](https://img.shields.io/badge/Android-8.0+-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
 [![Privacy 100% Offline](https://img.shields.io/badge/Privacy-100%25%20Offline-00C853?style=for-the-badge&logo=shield&logoColor=white)](#-privacy--security)
 [![Town Hall 19](https://img.shields.io/badge/Clash%20of%20Clans-TH19%20Ready-F9A825?style=for-the-badge&logo=supercell&logoColor=white)](#-key-features)
 [![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?style=for-the-badge&logo=googlematerial&logoColor=white)](#-customizable-widget-themes)
