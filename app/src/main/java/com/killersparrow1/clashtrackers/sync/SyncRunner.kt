@@ -35,14 +35,51 @@ object SyncRunner {
     suspend fun sync(context: Context, clipboard: String?, source: String): Result = withContext(NonCancellable) {
         val app = context.applicationContext
         val repo = StateRepository(app)
+        val lang = com.killersparrow1.clashtrackers.locale.LanguageManager.language(context)
+        val isPt = lang == "pt"
+        val isRu = lang == "ru"
+        val lctx = com.killersparrow1.clashtrackers.locale.LanguageManager.wrap(context)
         val result = try {
-            val lctx = com.killersparrow1.clashtrackers.locale.LanguageManager.wrap(app)
             if (clipboard.isNullOrBlank()) {
-                Result(false, lctx.getString(com.killersparrow1.clashtrackers.R.string.sync_fail_empty))
+                val msg = if (isPt) "Falha na sincronização: A área de transferência está vazia"
+                          else if (isRu) "Ошибка синхронизации: Буфер обмена пуст"
+                          else "Sync failed: Clipboard is empty"
+                Result(false, msg)
             } else {
                 val export = when (val r = ExportParser.parse(clipboard)) {
                     is ParseResult.Invalid -> {
-                        val msg = "${lctx.getString(com.killersparrow1.clashtrackers.R.string.sync_fail_not_village)}: ${r.reason}"
+                        val translatedReason = when {
+                            r.reason.contains("Not JSON", ignoreCase = true) -> {
+                                if (isPt) "O texto copiado não é um formato JSON válido"
+                                else if (isRu) "Текст не является форматом JSON"
+                                else r.reason
+                            }
+                            r.reason.contains("Not a JSON object", ignoreCase = true) -> {
+                                if (isPt) "O texto copiado não é um objeto JSON válido"
+                                else if (isRu) "Текст не является объектом JSON"
+                                else r.reason
+                            }
+                            r.reason.contains("Missing buildings", ignoreCase = true) -> {
+                                if (isPt) "Lista de construções ausente nos dados"
+                                else if (isRu) "Список построек отсутствует"
+                                else r.reason
+                            }
+                            r.reason.contains("Missing or invalid tag", ignoreCase = true) -> {
+                                if (isPt) "Tag de jogador ausente ou inválida"
+                                else if (isRu) "Тег игрока отсутствует или неверен"
+                                else r.reason
+                            }
+                            r.reason.contains("Missing or invalid timestamp", ignoreCase = true) -> {
+                                if (isPt) "Data/hora da vila ausente"
+                                else if (isRu) "Временная метка отсутствует"
+                                else r.reason
+                            }
+                            else -> r.reason
+                        }
+                        val prefix = if (isPt) "Falha na sincronização: Os dados não são de uma vila válida"
+                                     else if (isRu) "Ошибка синхронизации: Неверные данные деревни"
+                                     else "Sync failed: Not village data"
+                        val msg = "$prefix: $translatedReason"
                         repo.log(source, false, msg)
                         return@withContext Result(false, plainText(msg))
                     }
@@ -56,10 +93,11 @@ object SyncRunner {
                 repo.ensureAccountAndSelect(tag)
 
                 val ok = outcome is SyncLogic.Outcome.Synced
-                Result(ok, plainText(outcome.describe(app, Names.get(app))))
+                Result(ok, plainText(outcome.describe(context, Names.get(app))))
             }
         } catch (t: Throwable) {
-            Result(false, "Error: ${t.javaClass.simpleName}: ${t.message}")
+            val prefix = if (isPt) "Erro" else if (isRu) "Ошибка" else "Error"
+            Result(false, "$prefix: ${t.javaClass.simpleName}: ${t.message}")
         }
         repo.log(source, result.ok, result.message)
         refreshWidgets(app, source)

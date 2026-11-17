@@ -35,26 +35,38 @@ object LanguageManager {
 
     /** Saves the choice. On Android 12 and older the caller must also recreate its activity. */
     fun set(context: Context, tag: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, tag).apply()
         if (Build.VERSION.SDK_INT >= 33) {
             context.getSystemService(LocaleManager::class.java)?.applicationLocales =
                 if (tag.isEmpty()) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
-        } else {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, tag).apply()
         }
+    }
+
+    /** Resolves the target locale: user chosen tag, or phone default. */
+    fun targetLocale(context: Context): Locale {
+        val tag = current(context)
+        if (tag.isNotEmpty()) return Locale.forLanguageTag(tag)
+        val prefTag = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, SYSTEM) ?: SYSTEM
+        if (prefTag.isNotEmpty()) return Locale.forLanguageTag(prefTag)
+        val sysLocales = context.resources.configuration.locales
+        return if (!sysLocales.isEmpty) sysLocales[0] else Locale.getDefault()
     }
 
     /**
      * Use in `attachBaseContext` of every activity (and for text drawn outside an activity, such as the
-     * widget). On Android 13+ the system already applies the language, so this returns [base] unchanged.
+     * widget). Ensures resources match the effective locale.
      */
     fun wrap(base: Context): Context {
-        if (Build.VERSION.SDK_INT >= 33) return base
-        val tag = base.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, SYSTEM) ?: SYSTEM
-        if (tag.isEmpty()) return base
-        val locale = Locale.forLanguageTag(tag)
-        Locale.setDefault(locale)
+        val target = targetLocale(base)
+        val targetLang = target.language.lowercase()
+        val effectiveLocale = when (targetLang) {
+            "pt" -> Locale("pt", "BR")
+            "ru" -> Locale("ru")
+            else -> Locale("en")
+        }
+        Locale.setDefault(effectiveLocale)
         val config = Configuration(base.resources.configuration)
-        config.setLocale(locale)
+        config.setLocale(effectiveLocale)
         return base.createConfigurationContext(config)
     }
 
@@ -75,12 +87,8 @@ object LanguageManager {
         }
     }
 
-    /** The language code ("ru") behind [current]: the chosen tag, or the phone's default language. */
-    fun language(context: Context): String {
-        val tag = current(context)
-        return if (tag.isNotEmpty()) Locale.forLanguageTag(tag).language
-        else context.resources.configuration.locales[0].language
-    }
+    /** The language code ("ru", "pt", "en") behind [current]: the chosen tag, or the phone's default language. */
+    fun language(context: Context): String = targetLocale(context).language.lowercase()
 
     /** True if [tag] and the current choice are the same language (so "ru" matches "ru-RU"). */
     fun isSelected(context: Context, tag: String): Boolean {

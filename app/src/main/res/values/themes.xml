@@ -7,7 +7,7 @@
     </style>
 
     <!-- SyncActivity: invisible, no window animation, so tapping Sync looks like nothing opened. -->
-    <style name="Theme.ClashTimer.Invisible" parent="android:Theme.Translucent.NoTitleBar">
+    <style name="Theme.ClashTimer.Invisible" parent="Theme.ClashTimer">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:colorBackgroundCacheHint">@null</item>
@@ -17,6 +17,10 @@
         <item name="android:windowDisablePreview">true</item>
         <item name="android:windowIsFloating">true</item>
         <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
     </style>
 </resources>

@@ -30,6 +30,10 @@ class SyncActivity : ComponentActivity() {
         finishQuietly()
     }
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.killersparrow1.clashtrackers.locale.LanguageManager.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
@@ -38,6 +42,23 @@ class SyncActivity : ComponentActivity() {
             overrideActivityTransition(android.app.Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
         }
         super.onCreate(savedInstanceState)
+
+        // Make window 1x1, completely transparent and not touch modal,
+        // so WindowManager never takes over or animates the status bar.
+        window.setGravity(android.view.Gravity.TOP or android.view.Gravity.START)
+        val lp = window.attributes
+        lp.width = 1
+        lp.height = 1
+        lp.alpha = 0f
+        lp.dimAmount = 0f
+        lp.flags = lp.flags or
+            android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        window.attributes = lp
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+
         log(null, "Sync screen opened from widget")
         handler.postDelayed(hardTimeout, HARD_TIMEOUT_MS)
     }
