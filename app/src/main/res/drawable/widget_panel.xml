@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default Wooden Panel (Pre-API 31) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:type="linear"
+                android:centerY="0.3"
+                android:startColor="#7A5639"
+                android:centerColor="#5A3F2B"
+                android:endColor="#3D2A1C" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item
+        android:left="16dp"
+        android:right="16dp"
+        android:top="2dp"
+        android:gravity="top"
+        android:height="1.5dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#26FFFFFF" />
+            <corners android:radius="1dp" />
+        </shape>
+    </item>
+</layer-list>

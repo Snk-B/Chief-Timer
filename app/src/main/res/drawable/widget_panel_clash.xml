@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Clash of Clans Authentic Inlaid Gold & Dark Wood Card Frame -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Layer 1: Outer Cast Iron / Dark Timber Rim (24dp radius) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#1A1109" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+
+    <!-- Layer 2: Authentic Clash of Clans Metallic Gold-Bronze Inlay (inset 2dp, 22dp radius) -->
+    <item
+        android:left="2dp"
+        android:top="2dp"
+        android:right="2dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:type="linear"
+                android:startColor="#E6B85C"
+                android:centerColor="#B37B2B"
+                android:endColor="#734714" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+
+    <!-- Layer 3: Inner Carved Relief Depth Shadow (inset 4dp, 20dp radius) -->
+    <item
+        android:left="4dp"
+        android:top="4dp"
+        android:right="4dp"
+        android:bottom="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#140C06" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+
+    <!-- Layer 4: Main Clash of Clans Rich Wood Planks Surface (inset 5dp, 19dp radius) -->
+    <item
+        android:left="5dp"
+        android:top="5dp"
+        android:right="5dp"
+        android:bottom="5dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:type="linear"
+                android:centerY="0.25"
+                android:startColor="#684224"
+                android:centerColor="#4D2F18"
+                android:endColor="#341E0E" />
+            <corners android:radius="19dp" />
+        </shape>
+    </item>
+
+    <!-- Layer 5: Top Ambient Specular Light Sheen -->
+    <item
+        android:left="20dp"
+        android:right="20dp"
+        android:top="7dp"
+        android:gravity="top"
+        android:height="1.5dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#26FFFFFF" />
+            <corners android:radius="1dp" />
+        </shape>
+    </item>
+</layer-list>
+
