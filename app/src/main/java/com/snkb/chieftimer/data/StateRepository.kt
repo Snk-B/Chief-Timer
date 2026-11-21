@@ -1,0 +1,547 @@
+package com.snkb.chieftimer.data
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.snkb.chieftimer.core.AccountMeta
+import com.snkb.chieftimer.core.AccountSettings
+import com.snkb.chieftimer.core.AccountsIndex
+import com.snkb.chieftimer.core.AppSettings
+import com.snkb.chieftimer.core.AppState
+import com.snkb.chieftimer.core.GlobalSettings
+import com.snkb.chieftimer.core.NameMap
+import com.snkb.chieftimer.core.SyncLog
+import com.snkb.chieftimer.core.SyncLogEntry
+import com.snkb.chieftimer.core.SyncLogic
+import com.snkb.chieftimer.core.UpgradeTimes
+import com.snkb.chieftimer.core.VillageExport
+import com.snkb.chieftimer.core.normalizeTag
+import com.snkb.chieftimer.locale.LanguageManager
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "chief_timer")
+
+/**
+ * All persisted state lives in one Preferences DataStore supporting multi-account storage and global settings.
+ */
+class StateRepository(context: Context) {
+    private val store = context.applicationContext.dataStore
+
+    private suspend fun ensureMigrated(prefs: MutablePreferences) {
+        if (prefs[ACCOUNTS_INDEX] != null) return
+        val oldStateText = prefs[OLD_STATE]
+        val oldSettingsText = prefs[OLD_SETTINGS]
+        val oldState = AppState.decode(oldStateText)
+        val oldSettings = AppSettings.decode(oldSettingsText)
+
+        val global = GlobalSettings(
+            notificationsEnabled = oldSettings.notificationsEnabled,
+            liveCountdown = oldSettings.liveCountdown,
+            widgetTheme = oldSettings.widgetTheme,
+            appTheme = oldSettings.appTheme,
+            widgetFollowsAppTheme = oldSettings.widgetFollowsAppTheme,
+            floatingTabBar = oldSettings.floatingTabBar,
+        )
+        prefs[GLOBAL_SETTINGS] = global.encode()
+
+        val tag = oldState.export?.tag?.let { normalizeTag(it) }
+        if (tag != null) {
+            prefs[stateKey(tag)] = oldState.encode()
+            val acctSettings = AccountSettings(
+                totalBuildersOverride = oldSettings.totalBuildersOverride,
+                boosts = oldSettings.boosts,
+                playerName = oldSettings.playerName,
+            )
+            prefs[settingsKey(tag)] = acctSettings.encode()
+            val index = AccountsIndex(
+                accounts = listOf(AccountMeta(tag, oldSettings.playerName, oldState.export?.townHallLevel)),
+                selectedTag = tag,
+            )
+            prefs[ACCOUNTS_INDEX] = index.encode()
+        } else {
+            prefs[ACCOUNTS_INDEX] = AccountsIndex().encode()
+        }
+        prefs.remove(OLD_STATE)
+        prefs.remove(OLD_SETTINGS)
+    }
+
+    private suspend fun readPrefs(): Preferences {
+        val prefs = store.data.first()
+        if (prefs[ACCOUNTS_INDEX] != null) return prefs
+        return store.edit { ensureMigrated(it) }
+    }
+
+    val accounts: Flow<List<AccountMeta>> = store.data.map { prefs ->
+        if (prefs[ACCOUNTS_INDEX] == null) {
+            val oldState = AppState.decode(prefs[OLD_STATE])
+            val tag = oldState.export?.tag?.let { normalizeTag(it) }
+            if (tag != null) {
+                val oldSettings = AppSettings.decode(prefs[OLD_SETTINGS])
+                listOf(AccountMeta(tag, oldSettings.playerName, oldState.export?.townHallLevel))
+            } else emptyList()
+        } else {
+            AccountsIndex.decode(prefs[ACCOUNTS_INDEX]).accounts
+        }
+    }.distinctUntilChanged()
+
+    val selectedAccountTag: Flow<String?> = store.data.map { prefs ->
+        if (prefs[ACCOUNTS_INDEX] == null) {
+            AppState.decode(prefs[OLD_STATE]).export?.tag?.let { normalizeTag(it) }
+        } else {
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            index.selectedTag ?: index.accounts.firstOrNull()?.tag
+        }
+    }.distinctUntilChanged()
+
+    val state: Flow<AppState> = store.data.map { prefs ->
+        if (prefs[ACCOUNTS_INDEX] == null) {
+            AppState.decode(prefs[OLD_STATE])
+        } else {
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val tag = index.selectedTag ?: index.accounts.firstOrNull()?.tag
+            if (tag != null) AppState.decode(prefs[stateKey(tag)]) else AppState()
+        }
+    }.distinctUntilChanged()
+
+    val settings: Flow<AppSettings> = store.data.map { prefs ->
+        if (prefs[ACCOUNTS_INDEX] == null) {
+            AppSettings.decode(prefs[OLD_SETTINGS])
+        } else {
+            val global = GlobalSettings.decode(prefs[GLOBAL_SETTINGS])
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val tag = index.selectedTag ?: index.accounts.firstOrNull()?.tag
+            val acctSettings = if (tag != null) AccountSettings.decode(prefs[settingsKey(tag)]) else AccountSettings()
+            AppSettings(
+                totalBuildersOverride = acctSettings.totalBuildersOverride,
+                boosts = acctSettings.boosts,
+                notificationsEnabled = global.notificationsEnabled,
+                liveCountdown = global.liveCountdown,
+                playerName = acctSettings.playerName,
+                widgetTheme = global.widgetTheme,
+                appTheme = global.appTheme,
+                widgetFollowsAppTheme = global.widgetFollowsAppTheme,
+                floatingTabBar = global.floatingTabBar,
+            )
+        }
+    }.distinctUntilChanged()
+
+    val syncLog: Flow<SyncLog> = store.data.map { SyncLog.decode(it[SYNC_LOG]) }.distinctUntilChanged()
+
+    suspend fun currentState(): AppState {
+        val prefs = readPrefs()
+        val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+        val tag = index.selectedTag ?: index.accounts.firstOrNull()?.tag
+        return tag?.let { AppState.decode(prefs[stateKey(it)]) } ?: AppState()
+    }
+
+    suspend fun currentSettings(): AppSettings {
+        val prefs = readPrefs()
+        val global = GlobalSettings.decode(prefs[GLOBAL_SETTINGS])
+        val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+        val tag = index.selectedTag ?: index.accounts.firstOrNull()?.tag
+        val acct = tag?.let { AccountSettings.decode(prefs[settingsKey(it)]) } ?: AccountSettings()
+        return AppSettings(
+            totalBuildersOverride = acct.totalBuildersOverride,
+            boosts = acct.boosts,
+            notificationsEnabled = global.notificationsEnabled,
+            liveCountdown = global.liveCountdown,
+            playerName = acct.playerName,
+            widgetTheme = global.widgetTheme,
+            appTheme = global.appTheme,
+            widgetFollowsAppTheme = global.widgetFollowsAppTheme,
+            floatingTabBar = global.floatingTabBar,
+        )
+    }
+
+    suspend fun selectAccount(tag: String) {
+        val norm = normalizeTag(tag)
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            if (index.accounts.any { it.tag == norm }) {
+                prefs[ACCOUNTS_INDEX] = index.copy(selectedTag = norm).encode()
+            }
+        }
+    }
+
+    suspend fun ensureAccountAndSelect(tag: String) {
+        val norm = normalizeTag(tag)
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val exists = index.accounts.any { it.tag == norm }
+            val updatedAccounts = if (exists) index.accounts else index.accounts + AccountMeta(norm, null)
+            prefs[ACCOUNTS_INDEX] = index.copy(accounts = updatedAccounts, selectedTag = norm).encode()
+        }
+    }
+
+    suspend fun renameAccount(tag: String, newName: String) {
+        val norm = normalizeTag(tag)
+        val cleaned = AppSettings.cleanName(newName)
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val updatedAccounts = index.accounts.map { if (it.tag == norm) it.copy(name = cleaned) else it }
+            prefs[ACCOUNTS_INDEX] = index.copy(accounts = updatedAccounts).encode()
+            val acct = AccountSettings.decode(prefs[settingsKey(norm)])
+            prefs[settingsKey(norm)] = acct.copy(playerName = cleaned).encode()
+        }
+    }
+
+    suspend fun deleteAccount(tag: String) {
+        val norm = normalizeTag(tag)
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val remaining = index.accounts.filter { it.tag != norm }
+            val nextSelected = if (index.selectedTag == norm) remaining.firstOrNull()?.tag else index.selectedTag
+            prefs[ACCOUNTS_INDEX] = AccountsIndex(accounts = remaining, selectedTag = nextSelected).encode()
+            prefs.remove(stateKey(norm))
+            prefs.remove(settingsKey(norm))
+            prefs.remove(OLD_STATE)
+            prefs.remove(OLD_SETTINGS)
+
+            val mapJson = prefs[WIDGET_MAPPING]
+            if (mapJson != null) {
+                val map = (runCatching { AppState.JSON.decodeFromString<Map<String, String>>(mapJson) }.getOrNull() ?: emptyMap()).toMutableMap()
+                val keysToRemove = map.filterValues { it == norm }.keys
+                if (keysToRemove.isNotEmpty()) {
+                    map.keys.removeAll(keysToRemove)
+                    prefs[WIDGET_MAPPING] = AppState.JSON.encodeToString(map)
+                }
+            }
+        }
+    }
+
+    suspend fun syncVillage(tag: String, export: VillageExport, clipboard: String): SyncLogic.Outcome {
+        val norm = normalizeTag(tag)
+        lateinit var outcome: SyncLogic.Outcome
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val oldState = AppState.decode(prefs[stateKey(norm)])
+            outcome = SyncLogic.apply(oldState, export, clipboard)
+            prefs[stateKey(norm)] = outcome.state.encode()
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val exists = index.accounts.any { it.tag == norm }
+            val th = outcome.state.export?.townHallLevel
+            if (outcome is SyncLogic.Outcome.Synced || !exists) {
+                val baseAccounts = if (exists) index.accounts else index.accounts + AccountMeta(norm, null, th)
+                val updatedAccounts = if (th != null) {
+                    baseAccounts.map { if (it.tag == norm) it.copy(townHall = th) else it }
+                } else baseAccounts
+                val nextSelected = if (outcome is SyncLogic.Outcome.Synced || index.selectedTag == null) norm else index.selectedTag
+                prefs[ACCOUNTS_INDEX] = index.copy(accounts = updatedAccounts, selectedTag = nextSelected).encode()
+            }
+        }
+        return outcome
+    }
+
+    suspend fun getAccountState(tag: String): AppState {
+        val norm = normalizeTag(tag)
+        val prefs = readPrefs()
+        return AppState.decode(prefs[stateKey(norm)])
+    }
+
+    suspend fun updateAccountState(tag: String, transform: (AppState) -> AppState) {
+        val norm = normalizeTag(tag)
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val current = AppState.decode(prefs[stateKey(norm)])
+            val updated = transform(current)
+            prefs[stateKey(norm)] = updated.encode()
+            // Remember the Town Hall level on the account list (shown as the account picture).
+            val th = updated.export?.townHallLevel
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            if (th != null && index.accounts.any { it.tag == norm && it.townHall != th }) {
+                prefs[ACCOUNTS_INDEX] = index.copy(
+                    accounts = index.accounts.map { if (it.tag == norm) it.copy(townHall = th) else it },
+                ).encode()
+            }
+        }
+    }
+
+    /** Fills in the Town Hall level (account picture) for accounts synced before it was saved. */
+    suspend fun backfillTownHall() {
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            if (index.accounts.none { it.townHall == null }) return@edit
+            val filled = index.accounts.map { a ->
+                if (a.townHall != null) a else a.copy(townHall = AppState.decode(prefs[stateKey(a.tag)]).export?.townHallLevel)
+            }
+            if (filled != index.accounts) prefs[ACCOUNTS_INDEX] = index.copy(accounts = filled).encode()
+        }
+    }
+
+    suspend fun getAccountSettings(tag: String): AccountSettings {
+        val norm = normalizeTag(tag)
+        val prefs = readPrefs()
+        return AccountSettings.decode(prefs[settingsKey(norm)])
+    }
+
+    suspend fun updateAccountSettings(tag: String, transform: (AccountSettings) -> AccountSettings) {
+        val norm = normalizeTag(tag)
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val current = AccountSettings.decode(prefs[settingsKey(norm)])
+            val updated = transform(current)
+            prefs[settingsKey(norm)] = updated.encode()
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val updatedAccounts = index.accounts.map { if (it.tag == norm) it.copy(name = updated.playerName) else it }
+            prefs[ACCOUNTS_INDEX] = index.copy(accounts = updatedAccounts).encode()
+        }
+    }
+
+    suspend fun getWidgetAccount(appWidgetId: Int): String? {
+        val prefs = readPrefs()
+        val mapJson = prefs[WIDGET_MAPPING] ?: return null
+        val map = runCatching { AppState.JSON.decodeFromString<Map<String, String>>(mapJson) }.getOrNull() ?: emptyMap()
+        return map[appWidgetId.toString()]
+    }
+
+    suspend fun setWidgetAccount(appWidgetId: Int, tag: String) {
+        val norm = normalizeTag(tag)
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val mapJson = prefs[WIDGET_MAPPING]
+            val map = (mapJson?.let { runCatching { AppState.JSON.decodeFromString<Map<String, String>>(it) }.getOrNull() } ?: emptyMap()).toMutableMap()
+            map[appWidgetId.toString()] = norm
+            prefs[WIDGET_MAPPING] = AppState.JSON.encodeToString(map)
+        }
+    }
+
+    /** Look of one placed widget: [WIDGET_STYLE_LIST] (default) or [WIDGET_STYLE_TILES]. */
+    suspend fun getWidgetStyle(appWidgetId: Int): String {
+        val json = store.data.first()[WIDGET_STYLES] ?: return WIDGET_STYLE_LIST
+        val map = runCatching { AppState.JSON.decodeFromString<Map<String, String>>(json) }.getOrNull() ?: emptyMap()
+        return map[appWidgetId.toString()] ?: WIDGET_STYLE_LIST
+    }
+
+    suspend fun setWidgetStyle(appWidgetId: Int, style: String) {
+        store.edit { prefs ->
+            val map = (prefs[WIDGET_STYLES]?.let { runCatching { AppState.JSON.decodeFromString<Map<String, String>>(it) }.getOrNull() } ?: emptyMap()).toMutableMap()
+            map[appWidgetId.toString()] = style
+            prefs[WIDGET_STYLES] = AppState.JSON.encodeToString(map)
+        }
+    }
+
+    suspend fun removeWidgetAccount(appWidgetId: Int) {
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            prefs[WIDGET_STYLES]?.let { json ->
+                val styles = (runCatching { AppState.JSON.decodeFromString<Map<String, String>>(json) }.getOrNull() ?: emptyMap()).toMutableMap()
+                if (styles.remove(appWidgetId.toString()) != null) prefs[WIDGET_STYLES] = AppState.JSON.encodeToString(styles)
+            }
+            prefs[WIDGET_THEME]?.let { json ->
+                val themes = (runCatching { AppState.JSON.decodeFromString<Map<String, String>>(json) }.getOrNull() ?: emptyMap()).toMutableMap()
+                if (themes.remove(appWidgetId.toString()) != null) prefs[WIDGET_THEME] = AppState.JSON.encodeToString(themes)
+            }
+            val mapJson = prefs[WIDGET_MAPPING] ?: return@edit
+            val map = (runCatching { AppState.JSON.decodeFromString<Map<String, String>>(mapJson) }.getOrNull() ?: emptyMap()).toMutableMap()
+            if (map.remove(appWidgetId.toString()) != null) {
+                prefs[WIDGET_MAPPING] = AppState.JSON.encodeToString(map)
+            }
+        }
+    }
+
+    suspend fun getAllWidgetMappings(): Map<Int, String> {
+        val prefs = readPrefs()
+        val mapJson = prefs[WIDGET_MAPPING] ?: return emptyMap()
+        val map = runCatching { AppState.JSON.decodeFromString<Map<String, String>>(mapJson) }.getOrNull() ?: emptyMap()
+        return map.mapKeys { it.key.toIntOrNull() ?: 0 }.filterKeys { it != 0 }
+    }
+
+    suspend fun getWidgetTheme(appWidgetId: Int): String {
+        val prefs = readPrefs()
+        val global = GlobalSettings.decode(prefs[GLOBAL_SETTINGS])
+        val fallback = global.effectiveWidgetTheme
+        val mapJson = prefs[WIDGET_THEME] ?: return fallback
+        val map = runCatching { AppState.JSON.decodeFromString<Map<String, String>>(mapJson) }.getOrNull() ?: emptyMap()
+        return map[appWidgetId.toString()] ?: fallback
+    }
+
+    suspend fun setWidgetTheme(appWidgetId: Int, theme: String) {
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val mapJson = prefs[WIDGET_THEME]
+            val map = (mapJson?.let { runCatching { AppState.JSON.decodeFromString<Map<String, String>>(it) }.getOrNull() } ?: emptyMap()).toMutableMap()
+            map[appWidgetId.toString()] = theme
+            prefs[WIDGET_THEME] = AppState.JSON.encodeToString(map)
+        }
+    }
+
+    /** Forgets every widget's own theme, so all widgets follow the app-wide theme chosen in Settings. */
+    suspend fun clearWidgetThemes() {
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            prefs.remove(WIDGET_THEME)
+        }
+    }
+
+    /** Atomically read-modify-write the app state of the selected account (or create/save if new account). */
+    suspend fun <R> updateState(transform: (AppState) -> Pair<AppState, R>): R {
+        var result: R? = null
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val tag = index.selectedTag ?: index.accounts.firstOrNull()?.tag
+            val key = tag?.let { stateKey(it) } ?: OLD_STATE
+            val (next, r) = transform(AppState.decode(prefs[key]))
+            prefs[key] = next.encode()
+            result = r
+        }
+        @Suppress("UNCHECKED_CAST")
+        return result as R
+    }
+
+    /** Appends to the on-screen sync log; never throws (it is diagnostics only). */
+    suspend fun log(source: String, ok: Boolean?, message: String) {
+        runCatching {
+            store.edit { prefs ->
+                ensureMigrated(prefs)
+                val entry = SyncLogEntry(System.currentTimeMillis() / 1000, source, ok, message)
+                prefs[SYNC_LOG] = SyncLog.decode(prefs[SYNC_LOG]).add(entry).encode()
+            }
+        }
+    }
+
+    /** Empties the on-screen activity log (diagnostics only). */
+    suspend fun clearLog() {
+        runCatching { store.edit { prefs -> prefs.remove(SYNC_LOG) } }
+    }
+
+    suspend fun updateSettings(transform: (AppSettings) -> AppSettings) {
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val global = GlobalSettings.decode(prefs[GLOBAL_SETTINGS])
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val tag = index.selectedTag ?: index.accounts.firstOrNull()?.tag
+            val acctKey = tag?.let { settingsKey(it) } ?: OLD_SETTINGS
+            val acct = tag?.let { AccountSettings.decode(prefs[settingsKey(it)]) }
+                ?: AccountSettings.decode(prefs[OLD_SETTINGS])
+
+            val currentAppSet = AppSettings(
+                totalBuildersOverride = acct.totalBuildersOverride,
+                boosts = acct.boosts,
+                notificationsEnabled = global.notificationsEnabled,
+                liveCountdown = global.liveCountdown,
+                playerName = acct.playerName,
+                widgetTheme = global.widgetTheme,
+                appTheme = global.appTheme,
+                widgetFollowsAppTheme = global.widgetFollowsAppTheme,
+                floatingTabBar = global.floatingTabBar,
+            )
+            val next = transform(currentAppSet)
+
+            if (next.effectiveWidgetTheme != global.effectiveWidgetTheme) {
+                // Propagate effective widget theme change immediately to all placed home-screen widgets
+                prefs.remove(WIDGET_THEME)
+            }
+
+            prefs[GLOBAL_SETTINGS] = GlobalSettings(
+                notificationsEnabled = next.notificationsEnabled,
+                liveCountdown = next.liveCountdown,
+                widgetTheme = next.widgetTheme,
+                appTheme = next.appTheme,
+                widgetFollowsAppTheme = next.widgetFollowsAppTheme,
+                floatingTabBar = next.floatingTabBar,
+            ).encode()
+
+            val updatedAcct = AccountSettings(
+                totalBuildersOverride = next.totalBuildersOverride,
+                boosts = next.boosts,
+                playerName = next.playerName,
+            )
+            prefs[acctKey] = updatedAcct.encode()
+            if (tag != null) {
+                val updatedAccounts = index.accounts.map { if (it.tag == tag) it.copy(name = next.playerName) else it }
+                prefs[ACCOUNTS_INDEX] = index.copy(accounts = updatedAccounts).encode()
+            }
+        }
+    }
+
+    suspend fun modifyState(transform: (AppState) -> AppState) {
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            val tag = index.selectedTag ?: index.accounts.firstOrNull()?.tag
+            val key = tag?.let { stateKey(it) } ?: OLD_STATE
+            prefs[key] = transform(AppState.decode(prefs[key])).encode()
+        }
+    }
+
+    companion object {
+        val OLD_STATE = stringPreferencesKey("state_json")
+        val OLD_SETTINGS = stringPreferencesKey("settings_json")
+        val ACCOUNTS_INDEX = stringPreferencesKey("accounts_index_json")
+        val GLOBAL_SETTINGS = stringPreferencesKey("global_settings_json")
+        val WIDGET_MAPPING = stringPreferencesKey("widget_mapping_json")
+        val WIDGET_THEME = stringPreferencesKey("widget_theme_json")
+        val WIDGET_STYLES = stringPreferencesKey("widget_styles_json")
+        const val WIDGET_STYLE_LIST = "list"
+        const val WIDGET_STYLE_TILES = "tiles"
+        const val WIDGET_STYLE_MINIMAL = "minimal"
+        val SYNC_LOG = stringPreferencesKey("sync_log_json")
+
+        fun stateKey(tag: String) = stringPreferencesKey("state_json_$tag")
+        fun settingsKey(tag: String) = stringPreferencesKey("settings_json_$tag")
+    }
+}
+
+/** Bundled name files per language (`assets/`); anything missing falls back to `names.json` (English). */
+object Names {
+    /** Language code → file name. To add a language: create `names_xx.json` and add one line here. */
+    private val LOCALIZED_FILES = mapOf("ru" to "names_ru.json", "pt" to "names_pt.json")
+    private val cached = mutableMapOf<String, NameMap>()
+
+    fun get(context: Context): NameMap {
+        runCatching { MaxDataStore.get(context) } // also hands names of newer items to NameMap.extra
+        val lang = LanguageManager.language(context)
+        return synchronized(this) { cached.getOrPut(lang) { load(context, lang) } }
+    }
+
+    private fun load(context: Context, lang: String): NameMap {
+        val text = WidgetTexts.get(context)
+        val app = context.applicationContext
+        val baseEn = runCatching {
+            app.assets.open("names.json").bufferedReader().use {
+                NameMap.fromJson(it.readText(), text)
+            }
+        }.getOrNull() ?: NameMap.fromJson("{}", text)
+
+        if (lang == "en" || !LOCALIZED_FILES.containsKey(lang)) {
+            return baseEn
+        }
+        val file = LOCALIZED_FILES[lang] ?: return baseEn
+        val localized = runCatching {
+            app.assets.open(file).bufferedReader().use {
+                NameMap.fromJson(it.readText(), text)
+            }
+        }.getOrNull() ?: return baseEn
+
+        return baseEn.mergedWith(localized)
+    }
+}
+
+/** Bundled `assets/upgrade_times.json` (full upgrade durations for the progress bars), loaded once. */
+object Times {
+    @Volatile private var cached: UpgradeTimes? = null
+
+    fun get(context: Context): UpgradeTimes {
+        runCatching { MaxDataStore.get(context) }
+        return cached ?: synchronized(this) {
+            cached ?: runCatching {
+                context.applicationContext.assets.open("upgrade_times.json").bufferedReader().use {
+                    UpgradeTimes.fromJson(it.readText())
+                }
+            }.getOrDefault(UpgradeTimes.EMPTY).also { cached = it }
+        }
+    }
+}

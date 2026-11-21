@@ -1,255 +1,326 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shorter row (25 dp) used when the widget is too short for 30 dp rows.
-     Generated layout pair: widget_row.xml / widget_row_compact.xml differ only in sizes. -->
+<!-- Compact Taverna Clash List Mode Row (34dp) with outer spacing wrapper -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/row"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="25dp"
-    android:layout_marginBottom="2dp"
-    android:background="@drawable/row_slot">
+    android:layout_height="wrap_content"
+    android:forceDarkAllowed="false"
+    android:paddingStart="1dp"
+    android:paddingTop="1.5dp"
+    android:paddingEnd="1dp"
+    android:paddingBottom="1.5dp"
+    tools:targetApi="29">
 
-    <!-- Green bar: progress = 1 - remaining / full upgrade time (max 1000). -->
-    <ProgressBar
-        android:id="@+id/row_fill"
-        style="@android:style/Widget.ProgressBar.Horizontal"
+    <FrameLayout
+        android:id="@+id/row"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_margin="1.5dp"
-        android:indeterminate="false"
-        android:indeterminateOnly="false"
-        android:max="1000"
-        android:maxHeight="200dp"
-        android:minHeight="0dp"
-        android:progress="0"
-        android:progressDrawable="@drawable/row_fill" />
-
-    <!-- Per-theme bar (only the one matching the widget theme is shown). -->
-    <ProgressBar
-        android:id="@+id/row_fill_clash"
-        style="@android:style/Widget.ProgressBar.Horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_margin="1.5dp"
-        android:indeterminate="false"
-        android:indeterminateOnly="false"
-        android:max="1000"
-        android:maxHeight="200dp"
-        android:minHeight="0dp"
-        android:progress="0"
-        android:visibility="gone"
-        android:progressDrawable="@drawable/row_fill_clash" />
-
-    <!-- Per-theme bar (only the one matching the widget theme is shown). -->
-    <ProgressBar
-        android:id="@+id/row_fill_dark"
-        style="@android:style/Widget.ProgressBar.Horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_margin="1.5dp"
-        android:indeterminate="false"
-        android:indeterminateOnly="false"
-        android:max="1000"
-        android:maxHeight="200dp"
-        android:minHeight="0dp"
-        android:progress="0"
-        android:visibility="gone"
-        android:progressDrawable="@drawable/row_fill_dark" />
-
-    <!-- Per-theme bar (only the one matching the widget theme is shown). -->
-    <ProgressBar
-        android:id="@+id/row_fill_light"
-        style="@android:style/Widget.ProgressBar.Horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_margin="1.5dp"
-        android:indeterminate="false"
-        android:indeterminateOnly="false"
-        android:max="1000"
-        android:maxHeight="200dp"
-        android:minHeight="0dp"
-        android:progress="0"
-        android:visibility="gone"
-        android:progressDrawable="@drawable/row_fill_light" />
+        android:layout_height="36dp"
+        android:padding="0dp"
+        android:background="@drawable/row_slot_tavern">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingStart="3.5dp"
+        android:paddingEnd="3.5dp">
 
         <FrameLayout
             android:id="@+id/row_icon_slot"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_marginStart="3dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/icon_slot">
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_marginEnd="5dp"
+            android:background="@drawable/icon_slot_tavern">
 
             <TextView
                 android:id="@+id/row_initials"
                 style="@style/WidgetSmallSans"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:textColor="#CFC3B0"
-                android:textSize="8dp"
+                android:textColor="#FFE38E"
+                android:textSize="8.5dp"
                 android:textStyle="bold" />
 
             <ImageView
                 android:id="@+id/row_icon"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="1dp"
+                android:padding="1.5dp"
                 android:scaleType="fitCenter"
                 android:visibility="gone" />
         </FrameLayout>
 
-        <!-- Name area. The inner wrap_content row lets the name shrink (ellipsize) only when it
-             doesn't fit, so the arrow and level stay right after it. -->
-        <FrameLayout
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1">
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingEnd="4dp">
 
             <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <LinearLayout
-                    android:id="@+id/row_goblin"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="4dp"
-                    android:background="@drawable/tag_goblin"
+                    android:layout_weight="1"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="4dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="4dp"
-                    android:paddingBottom="1dp"
-                    android:visibility="gone">
+                    android:orientation="horizontal">
 
-                    <ImageView
-                        android:id="@+id/row_goblin_icon"
-                        android:layout_width="10dp"
-                        android:layout_height="10dp"
-                        android:layout_marginEnd="2dp"
-                        android:visibility="gone" />
-
-                    <TextView
-                        style="@style/WidgetSmallSans"
+                    <LinearLayout
+                        android:id="@+id/row_goblin"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:fontFamily="sans-serif"
-                        android:id="@+id/lbl_goblin"
-                        android:text="@string/widget_goblin"
-                        android:textColor="#123B0C"
-                        android:textSize="8dp"
-                        android:textStyle="bold" />
+                        android:layout_marginEnd="3dp"
+                        android:background="@drawable/tag_goblin"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="3dp"
+                        android:paddingEnd="3dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/row_goblin_icon"
+                            android:layout_width="9dp"
+                            android:layout_height="9dp"
+                            android:layout_marginEnd="2dp"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/lbl_goblin"
+                            style="@style/WidgetSmallSans"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif"
+                            android:text="@string/widget_goblin"
+                            android:textColor="#123B0C"
+                            android:textSize="8dp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/row_name"
+                        style="@style/WidgetText.Name"
+                        android:fontFamily="@font/lilita_one"
+                        android:textStyle="bold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:shadowColor="#E6000000"
+                        android:shadowDy="1"
+                        android:shadowRadius="1.5"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11.5dp" />
+
+                    <ImageView
+                        android:id="@+id/row_arrow"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_marginStart="2dp"
+                        android:layout_marginEnd="1.5dp"
+                        android:src="@drawable/ic_arrow" />
+
+                    <TextView
+                        android:id="@+id/row_level"
+                        style="@style/WidgetText.Level"
+                        android:fontFamily="@font/lilita_one"
+                        android:textStyle="bold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#FFE082"
+                        android:textSize="10dp" />
                 </LinearLayout>
 
                 <TextView
-                    android:id="@+id/row_name"
-                    style="@style/WidgetText.Name"
-                    android:fontFamily="@font/lilita_one"
+                    android:id="@+id/row_pct"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textSize="12dp" />
-
-                <ImageView
-                    android:id="@+id/row_arrow"
-                    android:layout_width="9dp"
-                    android:layout_height="9dp"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="2dp"
-                    android:src="@drawable/ic_arrow" />
-
-                <TextView
-                    android:id="@+id/row_level"
-                    style="@style/WidgetText.Level"
+                    android:layout_marginStart="5dp"
                     android:fontFamily="@font/lilita_one"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="2dp"
-                    android:textSize="10dp" />
+                    android:textStyle="bold"
+                    android:includeFontPadding="false"
+                    android:shadowColor="#FF000000"
+                    android:shadowDy="1"
+                    android:shadowRadius="1.8"
+                    android:singleLine="true"
+                    android:textColor="#FFE89E"
+                    android:textSize="9.5dp" />
             </LinearLayout>
-        </FrameLayout>
 
-        <!-- Clock + countdown, or "Completed" + check. -->
+            <FrameLayout
+                android:id="@+id/row_bar_wrap"
+                android:layout_width="match_parent"
+                android:layout_height="7.5dp"
+                android:layout_marginTop="2dp">
+
+                <ProgressBar
+                    android:id="@+id/row_fill"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:indeterminateOnly="false"
+                    android:max="1000"
+                    android:maxHeight="20dp"
+                    android:minHeight="0dp"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/row_fill_tavern_green" />
+
+                <ProgressBar
+                    android:id="@+id/row_fill_clash"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:indeterminateOnly="false"
+                    android:max="1000"
+                    android:maxHeight="20dp"
+                    android:minHeight="0dp"
+                    android:progress="0"
+                    android:visibility="gone"
+                    android:progressDrawable="@drawable/row_fill_tavern_elixir" />
+
+                <ProgressBar
+                    android:id="@+id/row_fill_dark"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:indeterminateOnly="false"
+                    android:max="1000"
+                    android:maxHeight="20dp"
+                    android:minHeight="0dp"
+                    android:progress="0"
+                    android:visibility="gone"
+                    android:progressDrawable="@drawable/row_fill_tavern_gold" />
+
+                <ProgressBar
+                    android:id="@+id/row_fill_mat_1"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:indeterminateOnly="false"
+                    android:max="1000"
+                    android:maxHeight="20dp"
+                    android:minHeight="0dp"
+                    android:progress="0"
+                    android:visibility="gone"
+                    android:progressDrawable="@drawable/row_fill_material_1" />
+
+                <ProgressBar
+                    android:id="@+id/row_fill_mat_2"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:indeterminateOnly="false"
+                    android:max="1000"
+                    android:maxHeight="20dp"
+                    android:minHeight="0dp"
+                    android:progress="0"
+                    android:visibility="gone"
+                    android:progressDrawable="@drawable/row_fill_material_2" />
+
+                <ProgressBar
+                    android:id="@+id/row_fill_mat_3"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:indeterminateOnly="false"
+                    android:max="1000"
+                    android:maxHeight="20dp"
+                    android:minHeight="0dp"
+                    android:progress="0"
+                    android:visibility="gone"
+                    android:progressDrawable="@drawable/row_fill_material_3" />
+            </FrameLayout>
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_marginStart="3dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingEnd="3dp">
+            android:paddingEnd="2dp">
 
             <ImageView
                 android:id="@+id/row_clock"
-                android:layout_width="11dp"
-                android:layout_height="11dp"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
                 android:layout_marginEnd="2dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_clock" />
+                android:src="@drawable/ic_clock"
+                android:visibility="gone" />
 
             <Chronometer
                 android:id="@+id/row_chrono"
                 style="@style/WidgetText.Time"
-                android:fontFamily="monospace"
-                android:typeface="monospace"
+                android:fontFamily="@font/lilita_one"
+                android:textStyle="bold"
                 android:fontFeatureSettings="&quot;tnum&quot;"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:countDown="true"
+                android:shadowColor="#E6000000"
+                android:shadowDy="1"
+                android:shadowRadius="1.8"
                 android:singleLine="true"
+                android:textColor="#FFFFFF"
                 android:textSize="11.5dp" />
 
             <TextView
                 android:id="@+id/row_text"
                 style="@style/WidgetText.Time"
                 android:fontFamily="@font/lilita_one"
+                android:textStyle="bold"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="12dp"
+                android:textColor="#FFE082"
+                android:textSize="11dp"
                 android:visibility="gone" />
 
             <ImageView
                 android:id="@+id/row_check"
                 android:layout_width="14dp"
                 android:layout_height="14dp"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="2dp"
                 android:src="@drawable/ic_check"
                 android:visibility="gone" />
         </LinearLayout>
 
-        <!-- Green + (link helper) / gold helper badge; invisible on pets and finished rows. -->
         <FrameLayout
             android:id="@+id/row_btn"
-            android:layout_width="19dp"
-            android:layout_height="19dp"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/btn_plus">
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/btn_plus_tavern">
 
             <TextView
                 android:id="@+id/row_btn_text"
                 style="@style/WidgetSmallSans"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:fontFamily="sans-serif"
+                android:fontFamily="@font/lilita_one"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:includeFontPadding="false"
                 android:text="+"
                 android:textColor="#FFFFFF"
-                android:textSize="13dp"
-                android:textStyle="bold" />
+                android:textSize="13dp" />
 
             <ImageView
                 android:id="@+id/row_btn_icon"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="2dp"
+                android:padding="1.5dp"
                 android:scaleType="fitCenter"
                 android:visibility="gone" />
         </FrameLayout>
     </LinearLayout>
+    </FrameLayout>
 </FrameLayout>

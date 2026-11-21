@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Beveled Golden Square Frame for 3D Building / Troop / Pet Icons -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="7dp" />
+            <solid android:color="#140B04" />
+        </shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="6dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#FFE691"
+                android:centerColor="#D99E32"
+                android:endColor="#855612" />
+        </shape>
+    </item>
+    <item android:left="2.5dp" android:top="2.5dp" android:right="2.5dp" android:bottom="2.5dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="4.5dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#3D3328"
+                android:endColor="#211B16" />
+        </shape>
+    </item>
+</layer-list>

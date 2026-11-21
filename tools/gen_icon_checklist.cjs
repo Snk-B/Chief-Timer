@@ -60,7 +60,7 @@ function collect(dir, base = home) {
 
 const pad = s => (s + '.webp').padEnd(22);
 const lines = [
-  'Clash Timers widget icons',
+  'Chief Timer widget icons',
   '=========================',
   '',
   'Icons live in app/src/main/assets/icons/ with exactly these names. tools/gen_icons.cjs makes them',

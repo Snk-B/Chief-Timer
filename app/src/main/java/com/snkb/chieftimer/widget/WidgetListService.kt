@@ -1,0 +1,133 @@
+package com.snkb.chieftimer.widget
+
+import android.appwidget.AppWidgetManager
+import android.content.Context
+import android.content.Intent
+import android.widget.RemoteViews
+import android.widget.RemoteViewsService
+import com.snkb.chieftimer.core.WidgetModel
+import kotlinx.coroutines.runBlocking
+
+/** Feeds the scrolling List widget: section headings and timer rows, rebuilt whenever the widget redraws. */
+class WidgetListService : RemoteViewsService() {
+    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
+        Factory(
+            applicationContext,
+            intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID),
+            intent.getBooleanExtra(EXTRA_SMALL, false),
+            intent.getIntExtra(EXTRA_COLS, WidgetRenderer.TILES_PER_ROW),
+        )
+
+    companion object {
+        /** Intent extra: the widget is in its small size, so the list is one flat run of compact rows. */
+        const val EXTRA_SMALL = "small"
+
+        /** Intent extra: how many tiles fit side by side at the widget's current width. */
+        const val EXTRA_COLS = "cols"
+
+        private const val SLOW_LOAD_MS = 400L
+    }
+
+    /** What the renderer already knows, so embedding the items in the widget never re-reads storage. */
+    class Preset(val model: WidgetModel, val live: Boolean, val style: String?)
+
+    class Factory(
+        private val context: Context,
+        private val widgetId: Int,
+        private val small: Boolean,
+        private val cols: Int,
+        private val preset: Preset? = null,
+    ) : RemoteViewsFactory {
+        private var model: WidgetModel? = null
+        private var live = true
+        private var tiles = false
+        private var minimal = false
+        private var items: List<WidgetRenderer.ListItem> = emptyList()
+        private lateinit var renderer: WidgetRenderer
+
+        override fun onCreate() {
+            renderer = WidgetRenderer(context)
+        }
+
+        override fun onDataSetChanged() {
+            val startedAt = android.os.SystemClock.elapsedRealtime()
+            load()
+            // While the launcher waits for this call the widget cannot update. Slow loads are written to
+            // Support → Recent activity (with the app process's age, to tell cold starts apart) so a
+            // freeze can be matched to them.
+            val took = android.os.SystemClock.elapsedRealtime() - startedAt
+            if (took > SLOW_LOAD_MS) {
+                val processAgeS = (android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime()) / 1000
+                runCatching {
+                    runBlocking {
+                        com.snkb.chieftimer.data.StateRepository(context)
+                            .log("widget", null, "Widget list load took ${took} ms (app process age ${processAgeS} s)")
+                    }
+                }
+            }
+        }
+
+        private fun load() {
+            val built = preset?.let { it.model to it.live }
+                ?: runCatching { runBlocking { WidgetUpdater.modelFor(context, widgetId) } }.getOrNull()
+            if (built == null) {
+                items = emptyList()
+                return
+            }
+            model = built.first
+            live = built.second
+            val t = renderer.themePalette(built.first.widgetTheme)
+            val style = if (preset != null) preset.style else runCatching {
+                runBlocking { com.snkb.chieftimer.data.StateRepository(context).getWidgetStyle(widgetId) }
+            }.getOrNull()
+            tiles = style == com.snkb.chieftimer.data.StateRepository.WIDGET_STYLE_TILES
+            minimal = style == com.snkb.chieftimer.data.StateRepository.WIDGET_STYLE_MINIMAL && !small
+            items = when {
+                small -> renderer.smallItems(built.first)
+                tiles -> renderer.tileItems(built.first, t, cols)
+                else -> renderer.listItems(built.first, t)
+            }
+        }
+
+        override fun onDestroy() {
+            items = emptyList()
+        }
+
+        override fun getCount(): Int = items.size
+
+        override fun getViewAt(position: Int): RemoteViews = try {
+            buildView(position)
+        } catch (e: Throwable) {
+            // Show the problem in the row instead of Android's endless "Loading...".
+            RemoteViews(context.packageName, com.snkb.chieftimer.R.layout.widget_min_row).apply {
+                setTextViewText(com.snkb.chieftimer.R.id.mr_name, "ERR ${e.javaClass.simpleName}: ${e.message}")
+                setViewVisibility(com.snkb.chieftimer.R.id.mr_chrono, android.view.View.GONE)
+                setViewVisibility(com.snkb.chieftimer.R.id.mr_btn, android.view.View.INVISIBLE)
+            }
+        }
+
+        private fun buildView(position: Int): RemoteViews {
+            val m = model
+            val item = items.getOrNull(position)
+            if (m == null || item == null) return RemoteViews(context.packageName, com.snkb.chieftimer.R.layout.widget_list_header)
+            val t = renderer.themePalette(m.widgetTheme)
+            if (minimal) {
+                return when (item) {
+                    is WidgetRenderer.ListItem.Header -> renderer.minHeaderView(item, m)
+                    is WidgetRenderer.ListItem.Timer -> renderer.minRowView(item.row, m, live)
+                    else -> RemoteViews(context.packageName, com.snkb.chieftimer.R.layout.widget_min_header)
+                }
+            }
+            return when (item) {
+                is WidgetRenderer.ListItem.Header -> renderer.headerView(item, m, t)
+                is WidgetRenderer.ListItem.Timer -> renderer.timerView(item.row, m, live, t, compact = small, tone = item.tone)
+                is WidgetRenderer.ListItem.Tiles -> renderer.tilesView(item.rows, m, live, t, cols, tone = item.tone)
+            }
+        }
+
+        override fun getLoadingView(): RemoteViews? = null
+        override fun getViewTypeCount(): Int = 8
+        override fun getItemId(position: Int): Long = position.toLong()
+        override fun hasStableIds(): Boolean = false
+    }
+}

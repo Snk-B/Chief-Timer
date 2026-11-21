@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.ClashTimer" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowLightStatusBar">true</item>
+    <style name="Theme.ChiefTimer" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">@color/splash_bg</item>
     </style>
 
     <!-- SyncActivity: invisible, no window animation, so tapping Sync looks like nothing opened. -->
-    <style name="Theme.ClashTimer.Invisible" parent="Theme.ClashTimer">
+    <style name="Theme.ChiefTimer.Invisible" parent="Theme.ChiefTimer">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:colorBackgroundCacheHint">@null</item>

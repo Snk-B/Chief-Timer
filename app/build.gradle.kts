@@ -8,31 +8,31 @@ plugins {
 
 /**
  * Release signing is optional and stays OUTSIDE the project (never commit it). Put storeFile,
- * storePassword, keyAlias and keyPassword in ~/.android-signing/clashtimers/keystore.properties,
- * or pass another file with -PclashtimersSigning=<path to keystore.properties>.
+ * storePassword, keyAlias and keyPassword in ~/.android-signing/chieftimer/keystore.properties,
+ * or pass another file with -PchieftimerSigning=<path to keystore.properties>.
  * Without one, assembleRelease builds an unsigned APK. See "Building from source" in the README.
  */
-val signingPropsFile: File = (findProperty("clashtimersSigning") as String?)?.let(::File)
-    ?: File(System.getProperty("user.home"), ".android-signing/clashtimers/keystore.properties")
+val signingPropsFile: File = (findProperty("chieftimerSigning") as String?)?.let(::File)
+    ?: File(System.getProperty("user.home"), ".android-signing/chieftimer/keystore.properties")
 val signingProps: Properties? = signingPropsFile.takeIf { it.isFile }?.let { f ->
     Properties().apply { f.inputStream().use(::load) }
 }
 
 android {
-    namespace = "com.killersparrow1.clashtrackers"
+    namespace = "com.snkb.chieftimer"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.killersparrow1.clashtrackers"
+        applicationId = "com.snkb.chieftimer"
         minSdk = 26
         targetSdk = 37
         // GitHub Actions passes the next release number (-PappVersionName=2.4 -PappVersionCode=204, from the
         // newest CT tag), so dev and release builds count upward together. The values below are only used
         // for local builds. Releases are named CT<versionName> (CT2.4 ... CT2.9, CT3.0).
-        versionCode = (findProperty("appVersionCode") as String?)?.toInt() ?: 3
-        versionName = (findProperty("appVersionName") as String?) ?: "1.0.2"
+        versionCode = (findProperty("appVersionCode") as String?)?.toInt() ?: 28
+        versionName = (findProperty("appVersionName") as String?) ?: "2.4.0"
         // Shown in crash reports (crash/CrashReporter.kt). R8 is off in every build (see release below).
         manifestPlaceholders["r8"] = "off"
 
@@ -40,13 +40,12 @@ android {
     }
 
     signingConfigs {
-        // One fixed key for every debug build (CI and local), so a new APK installs OVER the old one
-        // without uninstalling. This key is public on purpose (not secret); real releases use "release".
+        // One fixed key for every Chief Timer debug build (CI and local).
         create("fixedDebug") {
-            storeFile = rootProject.file("app/debug-signing.keystore")
-            storePassword = "android"
-            keyAlias = "clashtrackersdebug"
-            keyPassword = "android"
+            storeFile = rootProject.file("app/chieftimer-debug.keystore")
+            storePassword = "chieftimer"
+            keyAlias = "chieftimer"
+            keyPassword = "chieftimer"
         }
         if (signingProps != null) {
             create("release") {
@@ -104,7 +103,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 /**
- * `./gradlew archiveRelease` = assembleRelease, then copies app-release.apk to ClashTimers-<version>.apk
+ * `./gradlew archiveRelease` = assembleRelease, then copies app-release.apk to ChiefTimer-<version>.apk
  * in the project root. R8 is off, so there is no mapping file: crash reports are readable as-is.
  */
 abstract class ArchiveReleaseTask : DefaultTask() {
@@ -122,5 +121,5 @@ val releaseVersion = android.defaultConfig.versionName!!
 tasks.register<ArchiveReleaseTask>("archiveRelease") {
     dependsOn("assembleRelease")
     apk.set(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
-    apkOut.set(rootProject.layout.projectDirectory.file("ClashTimers-$releaseVersion.apk"))
+    apkOut.set(rootProject.layout.projectDirectory.file("ChiefTimer-$releaseVersion.apk"))
 }

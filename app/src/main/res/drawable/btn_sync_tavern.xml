@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3D Glossy Emerald-Green Clash Sync Button -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="9dp" />
+            <solid android:color="#0A2407" />
+        </shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <solid android:color="#145C0D" />
+        </shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="3dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#72EE42"
+                android:endColor="#289E1A" />
+        </shape>
+    </item>
+    <item android:left="3dp" android:top="2dp" android:right="3dp" android:bottom="14dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="6dp" />
+            <solid android:color="#48FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,38 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Top crown knob -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.5,2.0 L13.5,2.0 A0.9,0.9 0 0,1 14.4,2.9 L14.4,3.2 A0.9,0.9 0 0,1 13.5,4.1 L10.5,4.1 A0.9,0.9 0 0,1 9.6,3.2 L9.6,2.9 A0.9,0.9 0 0,1 10.5,2.0 Z" />
+    <!-- Crown neck stem -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.0,4.0 H13.0 V6.5 H11.0 Z" />
+    <!-- Pocket watch bezel ring -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,6.2 A7.8,7.8 0 1,0 12,21.8 A7.8,7.8 0 1,0 12,6.2 Z M12,8.3 A5.7,5.7 0 1,0 12,19.7 A5.7,5.7 0 1,0 12,8.3 Z" />
+    <!-- Cardinal dial hour ticks (12, 3, 6, 9) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.45,9.0 H12.55 V10.4 H11.45 Z M11.45,17.6 H12.55 V19.0 H11.45 Z M7.0,13.45 H8.4 V14.55 H7.0 Z M15.6,13.45 H17.0 V14.55 H15.6 Z" />
+    <!-- Center pivot -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,12.85 A1.15,1.15 0 1,0 12,15.15 A1.15,1.15 0 1,0 12,12.85 Z" />
+    <!-- V-shaped 10:10 watch hands matching Chief Timer pocket watch -->
+    <path
+        android:pathData="M12,14 L9.85,12.2"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.45"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M12,14 L15.2,11.4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.45"
+        android:strokeLineCap="round" />
+</vector>

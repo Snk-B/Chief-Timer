@@ -13,6 +13,7 @@
     <!-- Lilita One with the dark outline-like shadow used on the row text. -->
     <style name="WidgetText">
         <item name="android:fontFamily">@font/lilita_one</item>
+        <item name="android:textStyle">bold</item>
         <item name="android:textColor">@color/w_white</item>
         <item name="android:includeFontPadding">false</item>
         <item name="android:singleLine">true</item>
@@ -23,23 +24,26 @@
     </style>
 
     <style name="WidgetText.Name">
+        <item name="android:textStyle">bold</item>
         <item name="android:textSize">13.5dp</item>
         <item name="android:ellipsize">end</item>
     </style>
 
     <style name="WidgetText.Level">
+        <item name="android:textStyle">bold</item>
         <item name="android:textSize">11dp</item>
         <item name="android:textColor">@color/w_sub</item>
     </style>
 
     <style name="WidgetText.Time">
         <item name="android:textSize">13dp</item>
-        <item name="android:fontFamily">monospace</item>
-        <item name="android:typeface">monospace</item>
+        <item name="android:fontFamily">@font/lilita_one</item>
+        <item name="android:textStyle">bold</item>
         <item name="android:fontFeatureSettings">&quot;tnum&quot;</item>
     </style>
 
     <style name="WidgetText.Section">
+        <item name="android:textStyle">bold</item>
         <item name="android:textSize">12.5dp</item>
         <item name="android:textColor">@color/w_gold</item>
         <item name="android:letterSpacing">0.025</item>
@@ -49,6 +53,7 @@
     </style>
 
     <style name="WidgetText.Pill">
+        <item name="android:textStyle">bold</item>
         <item name="android:textSize">11dp</item>
         <item name="android:shadowRadius">0</item>
         <item name="android:shadowDy">0</item>

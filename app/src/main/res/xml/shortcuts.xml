@@ -8,8 +8,8 @@
         android:shortcutLongLabel="@string/shortcut_sync_long">
         <intent
             android:action="android.intent.action.MAIN"
-            android:targetPackage="com.killersparrow1.clashtrackers"
-            android:targetClass="com.killersparrow1.clashtrackers.sync.SyncActivity" />
+            android:targetPackage="com.snkb.chieftimer"
+            android:targetClass="com.snkb.chieftimer.sync.SyncActivity" />
     </shortcut>
     <shortcut
         android:shortcutId="open_game"

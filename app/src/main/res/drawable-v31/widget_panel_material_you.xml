@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:left="4.5dp" android:top="4.5dp" android:right="4.5dp" android:bottom="4.5dp">
+        <shape android:shape="rectangle">
+            <padding android:left="0dp" android:top="0dp" android:right="0dp" android:bottom="0dp" />
+            <corners android:radius="20dp" />
+            <gradient android:angle="270" android:startColor="@android:color/system_neutral2_800" android:endColor="@android:color/system_neutral2_900" />
+        </shape>
+    </item>
+    <item>
+        <nine-patch android:src="@drawable/widget_frame_metallic_9p" android:tint="@android:color/system_accent1_200" android:tintMode="multiply" />
+    </item>
+</layer-list>

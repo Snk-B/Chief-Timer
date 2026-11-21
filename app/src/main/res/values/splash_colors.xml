@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Window colour shown before the first frame (Android 11 and older). -->
 <resources>
-    <color name="splash_bg">#FFFBFE</color>
+    <color name="splash_bg">#1A1714</color>
 </resources>

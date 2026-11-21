@@ -5,134 +5,111 @@
 <h1 align="center">Chief Timer</h1>
 
 <p align="center">
-  <b>The ultimate offline companion widget and upgrade countdown tracker for Clash of Clans.</b><br>
-  <i>O assistente definitivo, seguro e 100% offline para rastrear suas construções e pesquisas no Clash of Clans.</i>
+  <b>3D Clash-style companion app, live countdown widgets, and Android 16+ Live Notifications for Clash of Clans.</b><br>
+  <i>O assistente 3D definitivo para acompanhar construtores, laboratório, pets e eventos no Clash of Clans — direto na tela inicial e na barra de status.</i>
 </p>
 
 <div align="center">
 
-[![Download APK](https://img.shields.io/badge/Download-APK%20v1.0.2-E040FB?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Snk-B/Chief-Timer/releases/latest)
+[![Download APK](https://img.shields.io/badge/Download-APK%20v2.4.0-F59E0B?style=for-the-badge&logo=android&logoColor=white)](https://github.com/SnK-B/Chief-Timer/releases/latest)
 [![Android 8.0+](https://img.shields.io/badge/Android-8.0+-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
-[![Privacy 100% Offline](https://img.shields.io/badge/Privacy-100%25%20Offline-00C853?style=for-the-badge&logo=shield&logoColor=white)](#-privacy--security)
 [![Town Hall 19](https://img.shields.io/badge/Clash%20of%20Clans-TH19%20Ready-F9A825?style=for-the-badge&logo=supercell&logoColor=white)](#-highlights)
-[![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?style=for-the-badge&logo=googlematerial&logoColor=white)](#widget-themes)
+[![Live Notifications](https://img.shields.io/badge/Android%2016+-Live%20Updates%20%2F%20Now%20Bar-FF6D00?style=for-the-badge&logo=android&logoColor=white)](#-live-notifications--samsung-now-bar)
+[![4 Themes](https://img.shields.io/badge/Themes-Tavern%203D%20%7C%20Material%20You-6750A4?style=for-the-badge&logo=googlematerial&logoColor=white)](#-themes-app--widgets)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 </div>
 
-A modern, offline Android application and home-screen widget for **Clash of Clans** that tracks your Home Village and Builder Base upgrade countdowns, potions, and special events in real time.
+---
 
-Designed with **Material 3 Expressive**, authentic Clash typography, an advanced boost calculation engine, dynamic Material You theming, and an ultra-deep **Pitch Black AMOLED** theme.
+**Chief Timer** is an open-source Android companion and home-screen widget suite for **Clash of Clans** covering **Home Village (up to TH19)** and **Builder Base 2.0**. Built with a custom **3D Tavern & Chiseled Stone UI**, animated wavy progress bars, an optional **in-game floating import button**, **Android 16+ Live Notifications / Samsung Now Bar**, and full **Material You** & **Material AMOLED** theming.
 
-> 🔒 **100% Private & Fully Offline**: Chief Timer does not request the `INTERNET` permission (`android.permission.INTERNET`). Your village data is never transmitted, uploaded, or shared. Everything stays strictly on your device.
+> 🔒 **Local-First Privacy**: Your village exports, player tags, and upgrade timers never leave your device. Network access is used strictly to fetch game data/HD icons from ClashKing, live Clash event schedules, and optional GitHub app update checks.
 
 ---
 
-## Screenshots
+## ✨ App Overview
 
 <p align="center">
-  <img src="docs/screenshots/screenshots.png" alt="Chief Timer App Screens" width="100%">
+  <img src="docs/screenshots/showcase_app_core.png" alt="Chief Timer Core Screens — Timers, Upgrades List, Road to Max, Bedtime Level Up" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/showcase_app_more.png" alt="Chief Timer Events & Settings — Clash Events, Settings, Personalization, Support" width="100%">
 </p>
 
 ---
 
-## Widget Themes
+## 🔥 What Sets Chief Timer Apart
 
-Five colour themes, chosen per widget: **Material You** (follows your phone's wallpaper colours), **Clash** (the authentic wood panel and green bars), **Dark** (neutral dark with a cyan bar), **Material pitch dark** (Material You colours on a true black AMOLED panel), and **Light** (clean white with a pale blue bar). Each theme has its own progress-bar colour, so text stays readable on every one.
-
-<p align="center">
-  <img src="docs/screenshots/material.jpg" alt="Material You theme" width="23%">
-  <img src="docs/screenshots/clash.jpg" alt="Clash theme" width="23%">
-  <img src="docs/screenshots/dark.jpg" alt="Dark theme" width="23%">
-  <img src="docs/screenshots/light.jpg" alt="Light theme" width="23%">
-</p>
-
-### List Widget
+### 🔔 Live Notifications & Samsung Now Bar
+Never miss an upgrade finishing in the final stretch. On **Android 16+ / One UI**, Chief Timer promotes an interactive **Live Update** chip directly into the status bar and lock screen / Now Bar during the final minutes of an upgrade, complete with a real-time countdown, progress bar, **Open game**, and **Dismiss alert** actions.
 
 <p align="center">
-  <img src="docs/screenshots/Widget List.png" alt="List Widget" width="100%">
+  <img src="docs/screenshots/showcase_live_notifications.png" alt="Live Status Bar Chip and Live Countdown Notification" width="82%">
 </p>
 
 ---
 
-### Grid Widget
+### 🎮 In-Game Clash Companion Button
+Optionally enable **Clash Companion** (or toggle it from Android Quick Settings) to show a compact floating **Hammer + Clock** button right inside Clash of Clans — letting you export your village JSON and sync Chief Timer with a single tap without leaving the game.
 
 <p align="center">
-  <img src="docs/screenshots/Widget Grid.png" alt="Grid Widget" width="100%">
+  <img src="docs/screenshots/showcase_companion_overlay.png" alt="In-Game Clash Companion Floating Import Button" width="88%">
 </p>
 
 ---
 
-## Highlights
+## 🎨 Themes (App & Widgets)
 
-### 🎨 Material 3 Expressive Interface
-- **Timers Dashboard**: Unified view of all ongoing upgrades with expressive cards, category chips, and animated `LinearWavyProgressIndicator` bars.
-- **Authentic Typography**: Built with the bundled **Lilita One** Clash font for headings, numbers, and badges, paired with clean, legible tabular system typography for body text.
-- **Completion Time on Every Card**: Each running timer shows a highlighted chip with the exact date and time it finishes, calculated from the same finish time as the countdown (boosts, potions, and helpers included).
-- **Collapsible Filter Chips**: Filter chips smoothly collapse when scrolling and reappear when scrolling back to the top.
-- **Dynamic Theming**: Full support for Material You dynamic color extraction (Android 12+) with expressive light and dark palettes.
+Customize the app and every home-screen widget independently across **4 distinct 3D palettes**:
+- **Clash Tavern**: Carved oak wood planks, 360° chiseled slate-stone plaques, golden bezels, and emerald/elixir/gold accents.
+- **Dark Tavern**: Charred ebony/charcoal wood planks paired with deep obsidian-slate plaques.
+- **Material You**: Dynamic colors extracted from your Android wallpaper (Android 12+).
+- **Material AMOLED**: Pitch-black `#000000` background with crisp dynamic neon accents for OLED screens.
 
-### 🏛️ Complete Village Coverage (TH19 Ready)
-- **Home Village**: Tracks all standard Builders (up to 6), the event Goblin Builder, the Laboratory, and the Pet House simultaneously.
-- **Town Hall 19 (TH19)**: Full support for all TH19 defenses, heroes, troops, and buildings.
-- **Builder Base 2.0**: Accurate tracking for B.O.B / O.T.T.O, Master Builder, and the Star Laboratory.
-- **Level-Specific HD Artwork**: Displays high-resolution building, trap, troop, and hero artwork matching the target upgrade level.
+### App Themes
+<p align="center">
+  <img src="docs/screenshots/showcase_app_themes.png" alt="Chief Timer App Themes — Clash Tavern, Dark Tavern, Material You, Material AMOLED" width="100%">
+</p>
 
-### ⚡ Advanced Boost & Event Simulation Engine
-- **Stacking Potions & Snacks**: Simulates 10× Builder Potions, 2× Builder Bites, 2× Study Soup, Research Potions, and Pet Potions with consecutive stacking rules.
-- **Builder Base Clock Tower**: Precise 10× speed boosts calibrated to verified Clock Tower levels (14 min to 32 min), complete with boost and cooldown timers.
-- **Apprentice & Lab Assistant**: Assign the Builder's Apprentice or Laboratory Assistant with a single tap to adjust predicted finish dates instantly.
-- **Deterministic Segment Engine**: Avoids floating-point calculation drift, guaranteeing exact completion times.
+### Home-Screen Widgets (Grid, List, Minimal & Road to Max)
+<p align="center">
+  <img src="docs/screenshots/showcase_widget_themes.png" alt="Chief Timer Widget Themes — Clash Tavern, Dark Tavern, Material You, Material AMOLED" width="100%">
+</p>
 
-### 🌍 Multi-Language Support
-Seamless multilingual interface supporting:
-- 🇧🇷 **Português (Brasil)**: 100% traduzido nativamente (interface, diálogos e notificações).
-- 🇺🇸 **English**: Full native English interface.
-- 🇷🇺 **Русский**: Full Russian localization.
+---
 
-### 👥 Multi-Account Support
-- Effortlessly manage multiple accounts.
-- Assign dedicated widgets to different accounts side-by-side on your home screen.
+## 🌟 Highlights
 
-### 🔔 Notifications
-- **Finish Alerts**: Notification when a builder, lab, or pet is free, complete with the Clash of Clans finish sound.
-- **Clock Tower Ready Alert**: Notification when the exported Clock Tower cooldown ends.
-- **Follow Do Not Disturb**: Compatible with system Do Not Disturb settings.
+- **🏛️ Complete Village Coverage (TH19 Ready)**: Simultaneously tracks all Home Village Builders (up to 6 + Goblin Builder), Laboratory, Pet House, and Builder Base 2.0 (Master Builder, B.O.B, Star Laboratory) with level-specific HD artwork.
+- **⚡ Deterministic Boost & Helper Engine**: Simulates stacking **Builder Potions (10×)**, **Builder Bites (2×)**, **Study Soup (2×)**, Research/Pet Potions, **Builder Base Clock Tower** cooldowns, and one-tap **Builder's Apprentice / Lab Assistant** assignment without calculation drift.
+- **🗺️ Smart Plan Tab**:
+  - **Road to Max**: Estimates remaining builder/lab/pet days and total Gold, Elixir, Dark Elixir, and Wall costs — with an **Include walls** toggle that dynamically updates overall Town Hall completion.
+  - **Bedtime Level Up**: Recommends upgrades that fit cleanly around your sleep window so builders never sit idle overnight.
+- **📅 Live Clash Events**: Tracks Raid Weekend, Clan Games, League Reset, Season End, and CWL sign-up/war schedules in your local time zone.
+- **👥 Multi-Account & Per-Widget Customization**: Manage multiple accounts and place dedicated List, Grid, Minimal, or Road to Max widgets side-by-side.
+- **🌍 Native Localization**: 🇧🇷 **Português (Brasil)** · 🇺🇸 **English** · 🇮🇳 **हिन्दी** · 🇷🇺 **Русский**.
 
 ---
 
 ## 🚀 Quick Setup / Como Usar
 
-### 1. Export Village Data from Clash of Clans / Exportar Dados do Jogo
-1. Open **Clash of Clans**.
-2. Tap your **Town Hall** (or Builder Hall) icon in the top-left corner.
-3. Open **Settings** ⚙️ ➔ **More Settings** (*Mais Configurações*).
-4. Scroll to the bottom and tap **Export Village JSON** (*Exportar dados da vila*). The village data is automatically copied to your clipboard.
-
-### 2. Sync with Chief Timer / Sincronizar com o Chief Timer
-- Open **Chief Timer** and tap **Sync from clipboard** (or enable *Auto-sync on open* in Settings).
-- *Alternatively*: Tap the **Sync** button directly on your home-screen widget!
-
-### 3. Place Your Widget / Adicionar o Widget na Tela Inicial
-1. Long-press any empty area on your Android home screen.
-2. Select **Widgets** ➔ **Chief Timer**.
-3. Choose your preferred layout (**List** or **Grid**) and theme, then place it!
+1. **Export Village Data**: Open **Clash of Clans** ➔ **Settings** ⚙️ ➔ **More Settings** ➔ tap **Export Village JSON** (copies to clipboard).
+2. **Sync**: Open **Chief Timer** (auto-syncs on open if enabled) — or tap **Sync** on your widget, or use the floating **Clash Companion** button inside the game.
+3. **Add Widgets**: Long-press your home screen ➔ **Widgets** ➔ **Chief Timer** ➔ pick **List**, **Grid**, **Minimal**, or **Road to Max** and choose your theme.
 
 ---
 
-## 📥 Download / Baixar APK
+## 📥 Download
 
-The latest ready-to-install APK can be downloaded directly from the official **Releases** page:
+Download the latest APK from the **[Releases](https://github.com/SnK-B/Chief-Timer/releases/latest)** page:
 
 <div align="center">
 
-### 👉 **[Download ChiefTimer.apk (v1.0.2)](https://github.com/Snk-B/Chief-Timer/releases/latest)** 👈
+### 👉 **[Download ChiefTimer.apk (v2.4.0)](https://github.com/SnK-B/Chief-Timer/releases/latest)** 👈
 
 </div>
-
-1. Download the `.apk` file directly to your Android device.
-2. Tap the file in your notification bar or Downloads folder to install.
-3. Open **Chief Timer**, sync your village, and enjoy your offline companion widget!
 
 ---
 
@@ -140,37 +117,39 @@ The latest ready-to-install APK can be downloaded directly from the official **R
 
 ### Prerequisites
 - **JDK 17** or newer
-- **Android SDK** (API 35, Android 15/16/17 build tools)
+- **Android SDK** (compileSdk 36 / Android 15–17 build tools)
 
-### Build Debug APK
 ```bash
 git clone https://github.com/SnK-B/Chief-Timer.git
 cd Chief-Timer
 ./gradlew assembleDebug
 ```
-The resulting APK will be generated at:
-`app/build/outputs/apk/debug/app-debug.apk`
 
-### Run Unit Tests
+Run the unit test suite (`284` tests):
 ```bash
 ./gradlew testDebugUnitTest
 ```
 
 ---
 
-## 🔒 Privacy & Security
+## 🔒 Privacy & Permissions
 
-Chief Timer respects your privacy unconditionally:
-- **Zero Network Access**: The app manifest does not request `android.permission.INTERNET`. It is technically impossible for the app to send data over the network.
-- **Local Storage Only**: Your village layout and upgrade timers are saved exclusively in your device's private app sandbox (`DataStore` / `Room`).
-- **No Trackers or Analytics**: No ads, no third-party SDKs, no telemetries.
+- **Village Data Stays Local**: Your village exports, player tags, and timers are stored strictly on-device (`DataStore` / `SharedPreferences`). Nothing personal is ever uploaded.
+- **Network Usage (`INTERNET`)**: Used exclusively to download updated ClashKing unit/building artwork & game data, synchronize live Clash event dates, and check GitHub Releases for app updates.
+- **Optional Permissions**: `SYSTEM_ALERT_WINDOW` / `PACKAGE_USAGE_STATS` are optional and used only if you enable the in-game Clash Companion floating button; `POST_PROMOTED_NOTIFICATIONS` powers Android 16+ Live Notifications.
+
+---
+
+## 🙏 Credits & Acknowledgements
+
+**Chief Timer** builds upon the open-source foundations created by:
+- **[Kuswaa/clash-timers](https://github.com/Kuswaa/clash-timers)** — Original creator of Clash Timers, the core deterministic countdown/boost engine, and the home-screen widget architecture.
+- **[Hy4ri/clash-timers (`feat/material-app-ui`)](https://github.com/Hy4ri/clash-timers/tree/feat/material-app-ui)** — Material 3 / Material You UI foundation.
 
 ---
 
 ## 📜 Disclaimer & License
 
-### Disclaimer
-This application is an unofficial fan project and is not affiliated with, endorsed, sponsored, or specifically approved by Supercell. Supercell is not responsible for the operation or content of this application. For more information regarding Supercell's policies, please visit [Supercell's Fan Content Policy](https://supercell.com/en/fan-content-policy/).
+This application is an unofficial fan project and is not affiliated with, endorsed, sponsored, or specifically approved by Supercell. For more information, see [Supercell's Fan Content Policy](https://supercell.com/en/fan-content-policy/).
 
-### License
 Distributed under the **MIT License**. See [LICENSE](LICENSE) for more details.

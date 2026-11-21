@@ -1,55 +1,129 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Scrolling List style: header, a ListView (section headers + timer rows, filled by WidgetListService),
-     footer. Same ids as widget_root.xml where they overlap. -->
+<!-- Taverna Clash Scrolling Widget: 9-patch frame with 3D metal corner brackets + curved 9-patch wood/obsidian header -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="6dp"
-    android:background="@android:color/transparent">
+    android:forceDarkAllowed="false"
+    android:padding="4dp"
+    android:background="@android:color/transparent"
+    tools:targetApi="29">
 
     <LinearLayout
         android:id="@+id/panel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/widget_panel"
-        android:clipToOutline="true"
-        android:orientation="vertical"
-        android:padding="10dp">
+        android:background="@drawable/widget_panel_tavern_9p"
+        android:orientation="vertical">
 
-        <LinearLayout android:id="@+id/header" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingStart="4dp" android:paddingTop="2dp" android:paddingEnd="4dp" android:paddingBottom="6dp">
-            <TextView android:id="@+id/who" style="@style/WidgetText" android:fontFamily="@font/lilita_one" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:shadowColor="#73000000" android:shadowDy="2" android:shadowRadius="0.01" android:ellipsize="end" android:text="Chief" android:textSize="17dp" />
-            <LinearLayout android:id="@+id/sync_button" android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/btn_sync" android:gravity="center_vertical" android:orientation="horizontal" android:paddingStart="10dp" android:paddingTop="4dp" android:paddingEnd="10dp" android:paddingBottom="6dp">
-                <ImageView android:layout_width="13dp" android:layout_height="13dp" android:layout_marginEnd="5dp" android:src="@drawable/ic_sync" />
-                <TextView style="@style/WidgetText" android:fontFamily="@font/lilita_one" android:layout_width="wrap_content" android:layout_height="wrap_content" android:shadowRadius="0" android:shadowDy="0" android:id="@+id/lbl_sync" android:text="@string/widget_sync" android:textColor="@color/w_sync_text" android:textSize="13dp" />
+        <!-- Curved Top Header Band (9-patch includes top inner curve + wood/obsidian texture + gold bottom divider) -->
+        <LinearLayout
+            android:id="@+id/header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_header_tavern"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/who_th_icon"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginEnd="6dp"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/who"
+                style="@style/WidgetText"
+                android:fontFamily="@font/lilita_one"
+                android:textStyle="bold"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:shadowColor="#E6000000"
+                android:shadowDy="2"
+                android:shadowRadius="2.5"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Chief"
+                android:textColor="#FFFFFF"
+                android:textSize="16.5dp" />
+
+            <LinearLayout
+                android:id="@+id/sync_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/btn_sync_tavern"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="6.5dp">
+
+                <ImageView
+                    android:layout_width="13dp"
+                    android:layout_height="13dp"
+                    android:layout_marginEnd="4dp"
+                    android:tint="#FFFFFF"
+                    android:src="@drawable/ic_sync" />
+
+                <TextView
+                    android:id="@+id/lbl_sync"
+                    style="@style/WidgetText"
+                    android:fontFamily="@font/lilita_one"
+                    android:textStyle="bold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:shadowColor="#CC000000"
+                    android:shadowDy="1.5"
+                    android:shadowRadius="2"
+                    android:text="@string/widget_sync"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12.5dp" />
             </LinearLayout>
         </LinearLayout>
-        
-                
-                
 
+        <!-- Main Carved Stone / Obsidian Content -->
         <LinearLayout
             android:id="@+id/content"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingStart="5dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="5dp"
+            android:paddingBottom="4dp">
 
             <ListView
                 android:id="@+id/list"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingTop="1dp"
+                android:paddingBottom="2dp"
                 android:divider="@null"
                 android:dividerHeight="0dp"
                 android:scrollbars="none" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="3dp"
+                android:scaleType="fitXY"
+                android:src="@drawable/pill_divider" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:paddingStart="4dp"
-                android:paddingTop="6dp"
-                android:paddingEnd="4dp">
+                android:paddingTop="3dp"
+                android:paddingEnd="4dp"
+                android:paddingBottom="1dp">
 
                 <TextView
                     android:id="@+id/foot_left"
@@ -58,21 +132,51 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:ellipsize="end" />
+                    android:ellipsize="end"
+                    android:textColor="#DFD1BC" />
 
                 <TextView
                     android:id="@+id/foot_right"
                     style="@style/WidgetText.Footer"
                     android:fontFamily="@font/lilita_one"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:textColor="#DFD1BC" />
             </LinearLayout>
         </LinearLayout>
 
-        <LinearLayout android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:minHeight="140dp" android:orientation="vertical" android:padding="12dp">
-            <TextView android:id="@+id/empty_text" style="@style/WidgetText" android:fontFamily="@font/lilita_one" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:singleLine="false" android:text="@string/widget_no_data" android:textSize="15dp" />
-            <TextView style="@style/WidgetText.Footer" android:fontFamily="@font/lilita_one" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:id="@+id/lbl_no_data_hint" android:text="@string/widget_no_data_hint" android:textSize="12dp" />
+        <LinearLayout
+            android:id="@+id/empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:minHeight="140dp"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/empty_text"
+                style="@style/WidgetText"
+                android:fontFamily="@font/lilita_one"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:singleLine="false"
+                android:text="@string/widget_no_data"
+                android:textColor="#FFFFFF"
+                android:textSize="15dp" />
+
+            <TextView
+                android:id="@+id/lbl_no_data_hint"
+                style="@style/WidgetText.Footer"
+                android:fontFamily="@font/lilita_one"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/widget_no_data_hint"
+                android:textColor="#DFD1BC"
+                android:textSize="12dp" />
         </LinearLayout>
-            
+
     </LinearLayout>
 </FrameLayout>

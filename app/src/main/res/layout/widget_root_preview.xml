@@ -1,0 +1,747 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher widget-picker preview of the Taverna Chief Timer widget filling 100% of the 4x4 frame -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:padding="4dp">
+
+    <LinearLayout
+        android:id="@+id/prev_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_panel_tavern_9p"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/prev_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_header_tavern"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/prev_title"
+                style="@style/WidgetText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/lilita_one"
+                android:includeFontPadding="false"
+                android:shadowColor="#E6000000"
+                android:shadowDy="2"
+                android:shadowRadius="2"
+                android:singleLine="true"
+                android:text="Chief Timer"
+                android:textColor="#FFFFFF"
+                android:textSize="13.5dp" />
+
+            <LinearLayout
+                android:id="@+id/prev_sync_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/btn_sync_tavern"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp">
+
+                <ImageView
+                    android:layout_width="11dp"
+                    android:layout_height="11dp"
+                    android:layout_marginEnd="4dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_sync" />
+
+                <TextView
+                    android:id="@+id/prev_sync_txt"
+                    style="@style/WidgetText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/lilita_one"
+                    android:includeFontPadding="false"
+                    android:text="@string/widget_sync"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp">
+
+            <!-- Builders Header -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="3dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/prev_sec_builders"
+                    style="@style/WidgetText.Section"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/lilita_one"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="0.01"
+                    android:singleLine="true"
+                    android:text="@string/widget_builders"
+                    android:textColor="#FFD863"
+                    android:textSize="10.5dp" />
+
+                <LinearLayout
+                    android:id="@+id/prev_pill_bite"
+                    android:layout_width="wrap_content"
+                    android:layout_height="19dp"
+                    android:background="@drawable/pill_off_tavern"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4.5dp"
+                    android:paddingEnd="4.5dp">
+
+                    <ImageView
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="2.5dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_builder_bite" />
+
+                    <TextView
+                        android:id="@+id/prev_bite_txt"
+                        style="@style/WidgetText.Pill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="@string/widget_bite"
+                        android:textColor="#E6D8C3"
+                        android:textSize="9.5dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/prev_pill_bpot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="19dp"
+                    android:layout_marginStart="3dp"
+                    android:background="@drawable/pill_off_tavern"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4.5dp"
+                    android:paddingEnd="4.5dp">
+
+                    <ImageView
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="2.5dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_builder_potion" />
+
+                    <TextView
+                        android:id="@+id/prev_bpot_txt"
+                        style="@style/WidgetText.Pill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="@string/widget_plus_one"
+                        android:textColor="#E6D8C3"
+                        android:textSize="9.5dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Builder Row 1: Archer Queen -->
+            <FrameLayout
+                android:id="@+id/prev_row_1"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginBottom="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/row_slot_tavern">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="6dp">
+
+                    <FrameLayout
+                        android:id="@+id/prev_icon_slot_1"
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/icon_slot_tavern">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@null"
+                            android:padding="2dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/prev_queen" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:paddingEnd="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/prev_name_1"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:singleLine="true"
+                                android:text="Archer Queen → 63"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11.5dp" />
+
+                            <TextView
+                                android:id="@+id/prev_pct_1"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:text="72%"
+                                android:textColor="#FFE89E"
+                                android:textSize="9.5dp" />
+                        </LinearLayout>
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="7dp"
+                            android:layout_marginTop="2dp">
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_tavern_1"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="720"
+                                android:progressDrawable="@drawable/row_fill_tavern_green" />
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_mat_1"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="720"
+                                android:progressDrawable="@drawable/row_fill_material_1"
+                                android:visibility="gone" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/prev_time_1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="2:51:02"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11.5dp" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Builder Row 2: Cannon -->
+            <FrameLayout
+                android:id="@+id/prev_row_2"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginBottom="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/row_slot_tavern">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="6dp">
+
+                    <FrameLayout
+                        android:id="@+id/prev_icon_slot_2"
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/icon_slot_tavern">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@null"
+                            android:padding="2dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/prev_cannon" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:paddingEnd="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/prev_name_2"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:singleLine="true"
+                                android:text="Cannon → 21"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11.5dp" />
+
+                            <TextView
+                                android:id="@+id/prev_pct_2"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:text="45%"
+                                android:textColor="#FFE89E"
+                                android:textSize="9.5dp" />
+                        </LinearLayout>
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="7dp"
+                            android:layout_marginTop="2dp">
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_tavern_2"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="450"
+                                android:progressDrawable="@drawable/row_fill_tavern_green" />
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_mat_2"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="450"
+                                android:progressDrawable="@drawable/row_fill_material_1"
+                                android:visibility="gone" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/prev_time_2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="1d 4h"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11.5dp" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Laboratory Header -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="3dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/prev_sec_lab"
+                    style="@style/WidgetText.Section"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/lilita_one"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="0.01"
+                    android:singleLine="true"
+                    android:text="@string/widget_laboratory"
+                    android:textColor="#FFD863"
+                    android:textSize="10.5dp" />
+
+                <LinearLayout
+                    android:id="@+id/prev_pill_rpot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="19dp"
+                    android:background="@drawable/pill_off_tavern"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4.5dp"
+                    android:paddingEnd="4.5dp">
+
+                    <ImageView
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="2.5dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_research_potion" />
+
+                    <TextView
+                        android:id="@+id/prev_rpot_txt"
+                        style="@style/WidgetText.Pill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="@string/widget_plus_one"
+                        android:textColor="#E6D8C3"
+                        android:textSize="9.5dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Laboratory Row -->
+            <FrameLayout
+                android:id="@+id/prev_row_3"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginBottom="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/row_slot_tavern">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="6dp">
+
+                    <FrameLayout
+                        android:id="@+id/prev_icon_slot_3"
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/icon_slot_tavern">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@null"
+                            android:padding="2dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/prev_lab" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:paddingEnd="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/prev_name_3"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:singleLine="true"
+                                android:text="Laboratory → 16"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11.5dp" />
+
+                            <TextView
+                                android:id="@+id/prev_pct_3"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:text="60%"
+                                android:textColor="#FFE89E"
+                                android:textSize="9.5dp" />
+                        </LinearLayout>
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="7dp"
+                            android:layout_marginTop="2dp">
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_tavern_3"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="600"
+                                android:progressDrawable="@drawable/row_fill_tavern_elixir" />
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_mat_3"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="600"
+                                android:progressDrawable="@drawable/row_fill_material_2"
+                                android:visibility="gone" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/prev_time_3"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="3d 9h"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11.5dp" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Pet House Header -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="3dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/prev_sec_pets"
+                    style="@style/WidgetText.Section"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/lilita_one"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="0.01"
+                    android:singleLine="true"
+                    android:text="@string/widget_pet_house"
+                    android:textColor="#FFD863"
+                    android:textSize="10.5dp" />
+
+                <LinearLayout
+                    android:id="@+id/prev_pill_ppot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="19dp"
+                    android:background="@drawable/pill_off_tavern"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4.5dp"
+                    android:paddingEnd="4.5dp">
+
+                    <ImageView
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="2.5dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_pet_potion" />
+
+                    <TextView
+                        android:id="@+id/prev_ppot_txt"
+                        style="@style/WidgetText.Pill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="@string/widget_plus_one"
+                        android:textColor="#E6D8C3"
+                        android:textSize="9.5dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Pet House Row -->
+            <FrameLayout
+                android:id="@+id/prev_row_4"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginBottom="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/row_slot_tavern">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="5dp"
+                    android:paddingEnd="6dp">
+
+                    <FrameLayout
+                        android:id="@+id/prev_icon_slot_4"
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/icon_slot_tavern">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@null"
+                            android:padding="2dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/prev_pet" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:paddingEnd="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/prev_name_4"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:singleLine="true"
+                                android:text="Sneezy → 8"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11.5dp" />
+
+                            <TextView
+                                android:id="@+id/prev_pct_4"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/lilita_one"
+                                android:includeFontPadding="false"
+                                android:text="35%"
+                                android:textColor="#FFE89E"
+                                android:textSize="9.5dp" />
+                        </LinearLayout>
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="7dp"
+                            android:layout_marginTop="2dp">
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_tavern_4"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="350"
+                                android:progressDrawable="@drawable/row_fill_tavern_gold" />
+
+                            <ProgressBar
+                                android:id="@+id/prev_bar_mat_4"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:max="1000"
+                                android:progress="350"
+                                android:progressDrawable="@drawable/row_fill_material_3"
+                                android:visibility="gone" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/prev_time_4"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/lilita_one"
+                        android:includeFontPadding="false"
+                        android:text="5d 16h"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11.5dp" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Bottom Footer -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp">
+
+                <TextView
+                    android:id="@+id/prev_footer_left"
+                    style="@style/WidgetText.Footer"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:text="@string/widget_apprentice_idle"
+                    android:textColor="#FFD863" />
+
+                <TextView
+                    android:id="@+id/prev_footer_synced"
+                    style="@style/WidgetText.Footer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:text="@string/widget_synced"
+                    android:textColor="#B8AA96" />
+
+                <TextView
+                    android:id="@+id/prev_footer_ago"
+                    style="@style/WidgetText.Footer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:text="@string/widget_just_now"
+                    android:textColor="#B8AA96" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
