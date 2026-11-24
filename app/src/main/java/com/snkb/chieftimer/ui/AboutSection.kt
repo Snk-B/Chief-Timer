@@ -56,7 +56,7 @@ const val FAN_CONTENT_DISCLAIMER =
     "This material is unofficial and is not endorsed by Supercell. For more information see " +
         "Supercell's Fan Content Policy: www.supercell.com/fan-content-policy."
 
-/** About: version, in-app GitHub updates for SnK-B/Chief-Timer, issue reporting, and ClashKing credits. */
+/** About: version, in-app GitHub updates for Snk-B/Chief-Timer, issue reporting, and ClashKing credits. */
 @Composable
 fun AboutSection(reportProvider: () -> String = { "" }) {
     val context = LocalContext.current
@@ -340,10 +340,10 @@ private fun reportIssue(context: Context, report: String) {
     openUrl(context, ISSUES_URL + "?body=" + Uri.encode(body))
 }
 
-private const val RELEASES_URL = "https://github.com/SnK-B/Chief-Timer/releases/latest"
-private const val ISSUES_LIST_URL = "https://github.com/SnK-B/Chief-Timer/issues"
-private const val ISSUES_URL = "https://github.com/SnK-B/Chief-Timer/issues/new"
-private const val FEATURE_URL = "https://github.com/SnK-B/Chief-Timer/issues/new?title=Feature+request%3A+&labels=enhancement"
+private const val RELEASES_URL = "https://github.com/Snk-B/Chief-Timer/releases/latest"
+private const val ISSUES_LIST_URL = "https://github.com/Snk-B/Chief-Timer/issues"
+private const val ISSUES_URL = "https://github.com/Snk-B/Chief-Timer/issues/new"
+private const val FEATURE_URL = "https://github.com/Snk-B/Chief-Timer/issues/new?title=Feature+request%3A+&labels=enhancement"
 
 private val CREDIT_LINKS = listOf(
     "ClashKing" to "https://clashk.ing",

@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
  * Clash > Events) and on demand; the last good copy is kept, so it also works offline.
  */
 object EventsStore {
-    private const val URL_TEXT = "https://raw.githubusercontent.com/SnK-B/Chief-Timer/main/data/events.json"
+    private const val URL_TEXT = "https://raw.githubusercontent.com/Snk-B/Chief-Timer/main/data/events.json"
     private const val PREFS = "events_remote"
     private const val MIN_GAP_MS = 60_000L // not again within a minute (screen rotation, quick re-opens)
     private const val MAX_BYTES = 256 * 1024

@@ -44,7 +44,7 @@ object UpdateCheck {
     }
 
     /**
-     * The release from `releases/latest`, or null when it has no APK. Only an `https://github.com/SnK-B/Chief-Timer/`
+     * The release from `releases/latest`, or null when it has no APK. Only an `https://github.com/Snk-B/Chief-Timer/`
      * asset link is accepted, so the app never downloads from anywhere else.
      */
     fun parseLatest(json: String): ReleaseInfo? {
@@ -55,7 +55,7 @@ object UpdateCheck {
         val apk = assets.map { it as? JsonObject }.firstNotNullOfOrNull { a ->
             val name = a?.get("name")?.jsonPrimitive?.contentOrNull ?: return@firstNotNullOfOrNull null
             val url = a["browser_download_url"]?.jsonPrimitive?.contentOrNull ?: return@firstNotNullOfOrNull null
-            if (name.endsWith(".apk", ignoreCase = true) && url.startsWith("https://github.com/SnK-B/Chief-Timer/")) Triple(name, url, a["size"]?.jsonPrimitive?.longOrNull ?: 0L) else null
+            if (name.endsWith(".apk", ignoreCase = true) && url.startsWith("https://github.com/Snk-B/Chief-Timer/", ignoreCase = true)) Triple(name, url, a["size"]?.jsonPrimitive?.longOrNull ?: 0L) else null
         } ?: return null
         return ReleaseInfo(
             tag = tag,

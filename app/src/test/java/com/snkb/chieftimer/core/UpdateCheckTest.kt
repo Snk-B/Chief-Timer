@@ -20,8 +20,8 @@ class UpdateCheckTest {
 
     @Test fun readsTheApkFromTheLatestRelease() {
         val json = """{"tag_name":"CT2.9","draft":false,"body":" Fixes things. ","assets":[
-            {"name":"notes.txt","browser_download_url":"https://github.com/SnK-B/Chief-Timer/releases/download/CT2.9/notes.txt","size":10},
-            {"name":"ChiefTimer-CT2.9.apk","browser_download_url":"https://github.com/SnK-B/Chief-Timer/releases/download/CT2.9/ChiefTimer-CT2.9.apk","size":9000000}]}"""
+            {"name":"notes.txt","browser_download_url":"https://github.com/Snk-B/Chief-Timer/releases/download/CT2.9/notes.txt","size":10},
+            {"name":"ChiefTimer-CT2.9.apk","browser_download_url":"https://github.com/Snk-B/Chief-Timer/releases/download/CT2.9/ChiefTimer-CT2.9.apk","size":9000000}]}"""
         val info = UpdateCheck.parseLatest(json)
         assertNotNull(info)
         assertEquals("2.9", info!!.version)

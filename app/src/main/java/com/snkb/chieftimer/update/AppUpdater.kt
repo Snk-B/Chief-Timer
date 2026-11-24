@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
  * Android itself checks that the new APK is signed with the same key as the installed app.
  */
 object AppUpdater {
-    private const val API_URL = "https://api.github.com/repos/SnK-B/Chief-Timer/releases/latest"
+    private const val API_URL = "https://api.github.com/repos/Snk-B/Chief-Timer/releases/latest"
     private const val USER_AGENT = "ChiefTimer-update-check"
 
     /** The latest release, or null when the repository has no release with an APK yet. Throws [IOException] on network problems. */

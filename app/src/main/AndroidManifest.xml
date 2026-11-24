@@ -14,7 +14,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- Online updates (app releases from SnK-B/Chief-Timer, ClashKing game data & icons, live Clash events), with offline cache fallback. -->
+    <!-- Online updates (app releases from Snk-B/Chief-Timer, ClashKing game data & icons, live Clash events), with offline cache fallback. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
