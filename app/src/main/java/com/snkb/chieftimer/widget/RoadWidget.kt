@@ -122,19 +122,23 @@ object RoadWidgetUpdater {
         val fallback = repo.selectedAccountTag.first() ?: accounts.firstOrNull()?.tag
         val data = MaxDataStore.get(app)
         val renderer = WidgetRenderer(app)
+        val applyGp = app.getSharedPreferences("plan_road", Context.MODE_PRIVATE).getBoolean("apply_gold_pass", true)
+        val multi = accounts.size > 1
         for (id in ids) {
             val tag = repo.getWidgetAccount(id) ?: fallback
             val name = accounts.firstOrNull { it.tag == tag }?.displayName
             val export = tag?.let { repo.getAccountState(it).export }
             val builders = if (tag == null) 1 else
                 AppSettings(totalBuildersOverride = repo.getAccountSettings(tag).totalBuildersOverride).totalBuilders(export)
-            val road = export?.let { RoadToMaxCalc.compute(data, it) }
+            val baseRoad = export?.let { RoadToMaxCalc.compute(data, it) }
+            val gp = if (applyGp && tag != null) com.snkb.chieftimer.sync.GoldPassStore.reduction(app, tag) else com.snkb.chieftimer.core.GoldPassReduction.NONE
+            val road = baseRoad?.withGoldPass(gp)
             val theme = repo.getWidgetTheme(id)
             val widthDp = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
             val pal = renderer.palette(theme)
-            val signature = Objects.hash(road, theme, pal.gold, pal.sub, widthDp >= WIDE_DP, tag, name, builders, Locale.getDefault())
+            val signature = Objects.hash(road, theme, pal.gold, pal.sub, widthDp >= WIDE_DP, tag, name, builders, multi, Locale.getDefault())
             if (!force && lastDrawn[id] == signature) continue
-            runCatching { manager.updateAppWidget(id, render(app, renderer, road, theme, widthDp >= WIDE_DP, name, builders)) }
+            runCatching { manager.updateAppWidget(id, render(app, renderer, road, theme, widthDp >= WIDE_DP, name, builders, id, multi)) }
                 .onSuccess { lastDrawn[id] = signature }
         }
         return ids.size
@@ -148,6 +152,8 @@ object RoadWidgetUpdater {
         wide: Boolean,
         name: String?,
         builders: Int,
+        appWidgetId: Int,
+        multipleAccounts: Boolean,
     ): RemoteViews {
         val ctx = LanguageManager.wrap(context)
         val t = renderer.palette(theme)
@@ -179,9 +185,15 @@ object RoadWidgetUpdater {
         rv.setViewVisibility(R.id.empty, View.GONE)
         rv.setViewVisibility(R.id.body, View.VISIBLE)
         val thPrefix = ctx.getString(R.string.widget_th_tag, road.townHall)
-        val head = listOfNotNull(name, ctx.getString(R.string.road_widget_title), thPrefix).joinToString(" · ")
+        val switchTag = if (multipleAccounts) " ⇄" else null
+        val head = listOfNotNull(name, ctx.getString(R.string.road_widget_title), thPrefix).joinToString(" · ") + (switchTag ?: "")
         rv.setTextViewText(R.id.who, head)
         rv.setOnClickPendingIntent(R.id.panel, openAppIntent(context))
+        if (multipleAccounts && appWidgetId > 0) {
+            val sw = switchRoadAccountIntent(context, appWidgetId)
+            rv.setOnClickPendingIntent(R.id.who, sw)
+            rv.setOnClickPendingIntent(R.id.who_th_icon, sw)
+        }
 
         fun row(label: String, value: String, building: Int?, drawable: Int?): RemoteViews {
             val r = RemoteViews(context.packageName, R.layout.widget_road_row)
@@ -227,6 +239,18 @@ object RoadWidgetUpdater {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?: Intent(context, com.snkb.chieftimer.MainActivity::class.java)
         return PendingIntent.getActivity(context, 10, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    }
+
+    private fun switchRoadAccountIntent(context: Context, appWidgetId: Int): PendingIntent {
+        val intent = Intent(context, WidgetInternalReceiver::class.java)
+            .setAction(ChiefWidgetReceiver.ACTION_SWITCH_ROAD_ACCOUNT)
+            .putExtra(ChiefWidgetReceiver.EXTRA_WIDGET_ID, appWidgetId)
+        return PendingIntent.getBroadcast(
+            context,
+            ("switch_road:$appWidgetId").hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun syncIntent(context: Context): PendingIntent {

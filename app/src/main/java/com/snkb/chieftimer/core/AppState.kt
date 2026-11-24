@@ -3,6 +3,17 @@ package com.snkb.chieftimer.core
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+@Serializable
+data class SyncDiff(
+    val at: Long,
+    val started: Int = 0,
+    val finished: Int = 0,
+    val levelsGained: Int = 0,
+    val wallsUpgraded: Int = 0,
+) {
+    val hasChanges: Boolean get() = started > 0 || finished > 0 || levelsGained > 0 || wallsUpgraded > 0
+}
+
 /**
  * Everything the widget needs, persisted as one JSON string in DataStore.
  * The export is kept as its raw text and re-parsed on load, so parser improvements in a later
@@ -26,6 +37,8 @@ data class AppState(
     val activeBoosts: ActiveBoostState = ActiveBoostState(),
     /** Configurable events (Hammer Jam, Builder Base Bonanza, etc.). */
     val eventSettings: EventSettings = EventSettings(),
+    /** Compact diff against the previous sync on this account. */
+    val lastDiff: SyncDiff? = null,
 ) {
     /** The parsed export, or null if nothing has been synced yet. */
     val export: VillageExport? by lazy {
@@ -80,6 +93,8 @@ data class GlobalSettings(
     val widgetFollowsAppTheme: Boolean = true,
     /** The bottom tabs float/hide on scroll; off = fixed docked bar that always stays visible. */
     val floatingTabBar: Boolean = true,
+    /** Pause continuous 30 FPS tube waves to save battery and reduce heat. */
+    val ecoAnimations: Boolean = false,
 ) {
     val effectiveAppTheme: String get() = appTheme ?: widgetTheme
     val effectiveWidgetTheme: String get() = if (widgetFollowsAppTheme) effectiveAppTheme else widgetTheme
@@ -128,6 +143,7 @@ data class AppSettings(
     val appTheme: String? = null,
     val widgetFollowsAppTheme: Boolean = true,
     val floatingTabBar: Boolean = true,
+    val ecoAnimations: Boolean = false,
 ) {
     val effectiveAppTheme: String get() = appTheme ?: widgetTheme
     val effectiveWidgetTheme: String get() = if (widgetFollowsAppTheme) effectiveAppTheme else widgetTheme

@@ -5,6 +5,9 @@ package com.snkb.chieftimer.ui
 import com.snkb.chieftimer.R
 import com.snkb.chieftimer.core.formatTimestamp
 import android.appwidget.AppWidgetManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -50,7 +53,9 @@ import com.snkb.chieftimer.core.SyncLog
 import com.snkb.chieftimer.core.SyncLogEntry
 import com.snkb.chieftimer.core.WidgetModel
 import com.snkb.chieftimer.core.WidgetRow
+import com.snkb.chieftimer.data.BackupBundle
 import com.snkb.chieftimer.sync.SyncRunner
+import com.snkb.chieftimer.widget.OverviewWidgetUpdater
 import com.snkb.chieftimer.widget.RoadWidgetUpdater
 import com.snkb.chieftimer.widget.WidgetAlarm
 import com.snkb.chieftimer.widget.WidgetIcons
@@ -77,10 +82,65 @@ fun SupportScreen(state: AppState, buildModel: (Long) -> WidgetModel, log: SyncL
     val refreshFailedText = stringResource(R.string.support_refresh_failed)
     val exactAllowed = remember(resumeTick) { WidgetAlarm.canScheduleExact(context) }
 
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+    var backupError by remember { mutableStateOf(false) }
+    val backupExportedText = stringResource(R.string.backup_exported)
+    val backupImportedText = stringResource(R.string.backup_imported)
+    val backupInvalidText = stringResource(R.string.backup_invalid)
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val json = StateRepository(context.applicationContext).exportBackup().encode()
+                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(json) }
+                        ?: error("openOutputStream failed")
+                }
+            }
+            result.onSuccess {
+                backupError = false
+                backupStatus = backupExportedText
+            }.onFailure {
+                backupError = true
+                backupStatus = it.message ?: backupInvalidText
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error("openInputStream failed")
+                    val bundle = BackupBundle.decode(json) ?: error("invalid backup")
+                    val count = StateRepository(context.applicationContext).importBackup(bundle)
+                    SyncRunner.refreshWidgets(context.applicationContext, "backup")
+                    count
+                }
+            }
+            result.onSuccess { count ->
+                backupError = false
+                backupStatus = backupImportedText.format(count)
+            }.onFailure {
+                backupError = true
+                backupStatus = backupInvalidText
+            }
+        }
+    }
+
     // The current state is a key: diagnostics never keep the initial, empty export captured.
     LaunchedEffect(state, resumeTick) {
         withContext(Dispatchers.IO) {
-            val count = runCatching { WidgetUpdater.widgetIds(context).size + RoadWidgetUpdater.ids(context).size }.getOrDefault(-1)
+            val count = runCatching {
+                WidgetUpdater.widgetIds(context).size + RoadWidgetUpdater.ids(context).size + OverviewWidgetUpdater.ids(context).size
+            }.getOrDefault(-1)
             val sizes = runCatching { widgetSizeReport(context, state) }.getOrDefault("")
             val icons = runCatching { WidgetIcons.get(context).available.size }.getOrDefault(0)
             widgetCount = count
@@ -235,6 +295,32 @@ fun SupportScreen(state: AppState, buildModel: (Long) -> WidgetModel, log: SyncL
                 }
             }
           }
+        }
+        item(key = "support_backup") {
+            SectionCard(stringResource(R.string.backup_title)) {
+                Text(
+                    stringResource(R.string.backup_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Clash3DButton(
+                        onClick = { exportLauncher.launch("chieftimer-backup.json") },
+                        style = ClashButtonStyle.GOLD,
+                    ) { ClashOutlinedText(stringResource(R.string.backup_export), fontSize = 13.5.sp) }
+                    Clash3DButton(
+                        onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+                        style = ClashButtonStyle.STONE,
+                    ) { ClashOutlinedText(stringResource(R.string.backup_import), fontSize = 13.5.sp) }
+                }
+                backupStatus?.let { msg ->
+                    Text(
+                        text = msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (backupError) MaterialTheme.colorScheme.error else com.snkb.chieftimer.ui.theme.TavernGreenLight,
+                    )
+                }
+            }
         }
         item(key = "support_about") {
             SectionCard(stringResource(R.string.support_about)) {

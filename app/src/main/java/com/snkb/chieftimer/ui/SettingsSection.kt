@@ -264,6 +264,36 @@ fun LazyListScope.settingsSectionItems(
                 }
             }
             Text(stringResource(R.string.settings_alert_desc), style = MaterialTheme.typography.bodyMedium, color = bodyColor)
+            var homeAlerts by remember { mutableStateOf(Notifier.homeAlerts(context)) }
+            var bbAlerts by remember { mutableStateOf(Notifier.builderBaseAlerts(context)) }
+            var helperAlerts by remember { mutableStateOf(Notifier.helperAlerts(context)) }
+            if (settings.notificationsEnabled) {
+                Text(stringResource(R.string.settings_alerts_villages), style = MaterialTheme.typography.bodySmall, color = bodyColor)
+                TavernCheckRow(
+                    label = stringResource(R.string.settings_alerts_home),
+                    detail = stringResource(R.string.settings_alerts_home_desc),
+                    checked = homeAlerts,
+                ) { on ->
+                    homeAlerts = on
+                    Notifier.setHomeAlerts(context, on)
+                }
+                TavernCheckRow(
+                    label = stringResource(R.string.settings_alerts_bb),
+                    detail = stringResource(R.string.settings_alerts_bb_desc),
+                    checked = bbAlerts,
+                ) { on ->
+                    bbAlerts = on
+                    Notifier.setBuilderBaseAlerts(context, on)
+                }
+                TavernCheckRow(
+                    label = stringResource(R.string.settings_alerts_helpers),
+                    detail = stringResource(R.string.settings_alerts_helpers_desc),
+                    checked = helperAlerts,
+                ) { on ->
+                    helperAlerts = on
+                    Notifier.setHelperAlerts(context, on)
+                }
+            }
 
             var liveNotifOn by remember { mutableStateOf(LiveUpdateAlert.enabled(context)) }
             var liveNotifMins by remember { mutableIntStateOf(LiveUpdateAlert.minutes(context)) }
@@ -379,10 +409,8 @@ fun LazyListScope.settingsSectionItems(
         SectionCard(stringResource(R.string.ev_settings_title)) {
             var evOn by remember { mutableStateOf(EventAlerts.enabled(context)) }
             var evLead by remember { mutableLongStateOf(EventAlerts.leadSec(context)) }
-            var evBlocked by remember { mutableStateOf(false) }
             SwitchRow(stringResource(R.string.ev_settings_enable), evOn) { on ->
                 evOn = on
-                evBlocked = false
                 EventAlerts.setEnabled(context, on)
                 if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !Notifier.allowed(context)) {
                     askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -426,15 +454,6 @@ fun LazyListScope.settingsSectionItems(
                                 },
                             )
                         }
-                    }
-                    Clash3DButton(
-                        onClick = { evBlocked = !EventAlerts.test(context) },
-                        style = ClashButtonStyle.STONE,
-                    ) {
-                        ClashOutlinedText(stringResource(R.string.ev_settings_test), fontSize = 13.5.sp)
-                    }
-                    if (evBlocked) {
-                        Text(stringResource(R.string.ev_settings_blocked), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -521,6 +540,7 @@ fun LazyListScope.settingsSectionItems(
                                 appTheme = it.appTheme,
                                 widgetFollowsAppTheme = it.widgetFollowsAppTheme,
                                 floatingTabBar = it.floatingTabBar,
+                                ecoAnimations = it.ecoAnimations,
                             )
                         }
                         confirmReset = false
@@ -627,6 +647,14 @@ fun LazyListScope.personalizationSectionItems(
                 style = MaterialTheme.typography.bodyMedium,
                 color = bodyColor,
             )
+            SwitchRow(stringResource(R.string.settings_eco_animations), settings.ecoAnimations) { on ->
+                onChange { it.copy(ecoAnimations = on) }
+            }
+            Text(
+                stringResource(R.string.settings_eco_animations_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = bodyColor,
+            )
         }
     }
 
@@ -721,6 +749,31 @@ fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
                 uncheckedBorderColor = pal.cardBorder,
             ),
         )
+    }
+}
+
+@Composable
+private fun TavernCheckRow(label: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val pal = LocalChiefPalette.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange).padding(vertical = 4.dp),
+    ) {
+        androidx.compose.material3.Checkbox(
+            checked = checked,
+            onCheckedChange = null,
+            colors = androidx.compose.material3.CheckboxDefaults.colors(
+                checkedColor = pal.pillActiveTop,
+                checkmarkColor = pal.pillActiveText,
+                uncheckedColor = pal.cardBorder,
+            ),
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

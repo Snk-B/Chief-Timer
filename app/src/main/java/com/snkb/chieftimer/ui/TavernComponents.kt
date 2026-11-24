@@ -46,17 +46,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.CacheDrawScope
+import androidx.compose.ui.draw.DrawResult
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -82,6 +92,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -307,61 +318,37 @@ fun TavernWoodBanner(
             .fillMaxWidth()
             .shadow(8.dp, shape)
             .clip(shape)
-            .drawBehind {
+            .drawWithCache {
                 val r = 16.dp.toPx()
-                // 1. Dark outer outline
-                drawRoundRect(bannerOuter, cornerRadius = CornerRadius(r, r))
-                // 2. Metallic bevel frame
                 val gPad = 1.5.dp.toPx()
-                drawRoundRect(
-                    brush = Brush.verticalGradient(listOf(accentLight, accent, accentDark)),
-                    topLeft = Offset(gPad, gPad),
-                    size = Size(size.width - gPad * 2, size.height - gPad * 2),
-                    cornerRadius = CornerRadius(r - gPad, r - gPad),
-                )
-                // 3. Inner dark groove
                 val iPad = 4.5.dp.toPx()
-                drawRoundRect(
-                    color = bannerGroove,
-                    topLeft = Offset(iPad, iPad),
-                    size = Size(size.width - iPad * 2, size.height - iPad * 2),
-                    cornerRadius = CornerRadius(r - iPad, r - iPad),
-                )
-                // 4. Polished Oak Wood (Classic) or Dynamic/Obsidian interior
                 val wPad = 6.dp.toPx()
-                if (woodBrush != null) {
-                    drawRoundRect(
-                        brush = woodBrush,
-                        topLeft = Offset(wPad, wPad),
-                        size = Size(size.width - wPad * 2, size.height - wPad * 2),
-                        cornerRadius = CornerRadius(r - wPad, r - wPad),
-                    )
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            if (isDarkWood) listOf(Color(0x188BA0C4), Color.Transparent, Color(0x4205070B))
-                            else listOf(Color(0x1EFFE3A3), Color.Transparent, Color(0x36140A03)),
-                        ),
-                        topLeft = Offset(wPad, wPad),
-                        size = Size(size.width - wPad * 2, size.height - wPad * 2),
-                        cornerRadius = CornerRadius(r - wPad, r - wPad),
+                val frameCorner = CornerRadius(r, r)
+                val gCorner = CornerRadius(r - gPad, r - gPad)
+                val iCorner = CornerRadius(r - iPad, r - iPad)
+                val wCorner = CornerRadius(r - wPad, r - wPad)
+                val gTopLeft = Offset(gPad, gPad)
+                val gSize = Size(size.width - gPad * 2, size.height - gPad * 2)
+                val iTopLeft = Offset(iPad, iPad)
+                val iSize = Size(size.width - iPad * 2, size.height - iPad * 2)
+                val wTopLeft = Offset(wPad, wPad)
+                val wSize = Size(size.width - wPad * 2, size.height - wPad * 2)
+                val bevelBrush = Brush.verticalGradient(listOf(accentLight, accent, accentDark))
+                val sheenBrush = if (woodBrush != null) {
+                    Brush.verticalGradient(
+                        if (isDarkWood) listOf(Color(0x188BA0C4), Color.Transparent, Color(0x4205070B))
+                        else listOf(Color(0x1EFFE3A3), Color.Transparent, Color(0x36140A03)),
                     )
                 } else {
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            listOf(bannerTop, bannerMid, bannerBot),
-                        ),
-                        topLeft = Offset(wPad, wPad),
-                        size = Size(size.width - wPad * 2, size.height - wPad * 2),
-                        cornerRadius = CornerRadius(r - wPad, r - wPad),
-                    )
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            listOf(accentLight.copy(alpha = 0.11f), Color.Transparent, Color(0x66020306)),
-                        ),
-                        topLeft = Offset(wPad, wPad),
-                        size = Size(size.width - wPad * 2, size.height - wPad * 2),
-                        cornerRadius = CornerRadius(r - wPad, r - wPad),
-                    )
+                    Brush.verticalGradient(listOf(accentLight.copy(alpha = 0.11f), Color.Transparent, Color(0x66020306)))
+                }
+                val interiorBrush = woodBrush ?: Brush.verticalGradient(listOf(bannerTop, bannerMid, bannerBot))
+                onDrawBehind {
+                    drawRoundRect(bannerOuter, cornerRadius = frameCorner)
+                    drawRoundRect(brush = bevelBrush, topLeft = gTopLeft, size = gSize, cornerRadius = gCorner)
+                    drawRoundRect(color = bannerGroove, topLeft = iTopLeft, size = iSize, cornerRadius = iCorner)
+                    drawRoundRect(brush = interiorBrush, topLeft = wTopLeft, size = wSize, cornerRadius = wCorner)
+                    drawRoundRect(brush = sheenBrush, topLeft = wTopLeft, size = wSize, cornerRadius = wCorner)
                 }
             }
             .padding(14.dp),
@@ -373,6 +360,247 @@ fun TavernWoodBanner(
 }
 
 internal enum class StoneCardPart { FULL, TOP, MIDDLE, BOTTOM }
+
+/**
+ * Caches all 3D stone plaque brushes, paths and edge notches per size/palette so scrolling and
+ * horizontal tab swipes allocate zero [Path] or [Brush] objects per frame.
+ */
+internal fun CacheDrawScope.cacheChiseledStoneSurface(
+    pal: Chief3DPalette,
+    highlighted: Boolean = false,
+    part: StoneCardPart = StoneCardPart.FULL,
+): DrawResult {
+    val isClash = pal.mode == ChiefThemeMode.CLASH
+    val isDark = pal.mode == ChiefThemeMode.DARK
+    val isAmoled = pal.mode == ChiefThemeMode.MATERIAL_AMOLED
+
+    val faceColors = when {
+        isClash && highlighted -> listOf(Color(0xFF463B24), Color(0xFF392F1C), Color(0xFF2B2314))
+        isClash -> listOf(Color(0xFF434647), Color(0xFF36393A), Color(0xFF2A2C2D))
+        isDark && highlighted -> listOf(Color(0xFF312B1C), Color(0xFF262115), Color(0xFF1B170F))
+        isDark -> listOf(Color(0xFF2C3548), Color(0xFF212838), Color(0xFF171D2A))
+        highlighted -> listOf(pal.cardHighlightTop, pal.cardHighlightBot)
+        else -> listOf(pal.cardTop, pal.cardMid, pal.cardBot)
+    }
+    val outerOutline = when {
+        highlighted -> pal.accent
+        isClash -> Color(0xFF090A0A)
+        isDark -> Color(0xFF04060A)
+        else -> lerp(pal.cardBorder, Color.Black, 0.55f)
+    }
+    val topBevel = when {
+        highlighted -> pal.accentLight
+        isClash -> Color(0xFF868B8A)
+        isDark -> Color(0xFF7D92BA)
+        else -> lerp(pal.cardBorder, Color.White, if (isAmoled) 0.16f else 0.30f)
+    }
+    val sideBevel = when {
+        highlighted -> Color(0xFFDFAC3A)
+        isClash -> Color(0xFF676C6C)
+        isDark -> Color(0xFF576B8F)
+        else -> pal.cardBorder
+    }
+    val botBevel = when {
+        highlighted && isDark -> Color(0xFFA87D24)
+        highlighted -> Color(0xFFB88726)
+        isClash -> Color(0xFF545859)
+        isDark -> Color(0xFF455675)
+        else -> lerp(pal.cardBorder, Color.Black, if (isAmoled) 0.25f else 0.35f)
+    }
+    val crackDark = outerOutline.copy(alpha = 0.90f)
+    val crackLight = topBevel.copy(alpha = if (isAmoled) 0.38f else 0.62f)
+
+    val w = size.width
+    val h = size.height
+    val r = 14.dp.toPx()
+    val outerW = (if (highlighted) 1.5.dp else 1.25.dp).toPx()
+    val bevelW = 1.7.dp.toPx()
+    val bevelIn = outerW + bevelW * 0.45f
+
+    val faceBrush = if (part == StoneCardPart.MIDDLE) null else Brush.verticalGradient(faceColors)
+    val middleColor = faceColors[faceColors.size / 2]
+    val sheenH = size.height * (if (part == StoneCardPart.FULL) 0.45f else 0.75f)
+    val sheenBrush = if (part == StoneCardPart.FULL || part == StoneCardPart.TOP) {
+        Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = if (isAmoled) 0.025f else 0.045f), Color.Transparent),
+            startY = 0f,
+            endY = sheenH,
+        )
+    } else null
+    val sheenSize = Size(w, sheenH)
+
+    fun buildEdges(inset: Float): Array<Path?> {
+        val ir = (r - inset).coerceAtLeast(2f)
+        return when (part) {
+            StoneCardPart.FULL -> {
+                val topPath = Path().apply {
+                    moveTo(inset, inset + ir)
+                    arcTo(Rect(inset, inset, inset + ir * 2, inset + ir * 2), 180f, 90f, false)
+                    lineTo(w - inset - ir, inset)
+                    arcTo(Rect(w - inset - ir * 2, inset, w - inset, inset + ir * 2), 270f, 90f, false)
+                }
+                val botPath = Path().apply {
+                    moveTo(inset, h - inset - ir)
+                    arcTo(Rect(inset, h - inset - ir * 2, inset + ir * 2, h - inset), 180f, -90f, false)
+                    lineTo(w - inset - ir, h - inset)
+                    arcTo(Rect(w - inset - ir * 2, h - inset - ir * 2, w - inset, h - inset), 90f, -90f, false)
+                }
+                arrayOf(topPath, botPath, null)
+            }
+            StoneCardPart.TOP -> {
+                val sidePath = Path().apply {
+                    moveTo(inset, h)
+                    lineTo(inset, inset + ir)
+                    arcTo(Rect(inset, inset, inset + ir * 2, inset + ir * 2), 180f, 90f, false)
+                    lineTo(w - inset - ir, inset)
+                    arcTo(Rect(w - inset - ir * 2, inset, w - inset, inset + ir * 2), 270f, 90f, false)
+                    lineTo(w - inset, h)
+                }
+                val topArc = Path().apply {
+                    moveTo(inset, inset + ir)
+                    arcTo(Rect(inset, inset, inset + ir * 2, inset + ir * 2), 180f, 90f, false)
+                    lineTo(w - inset - ir, inset)
+                    arcTo(Rect(w - inset - ir * 2, inset, w - inset, inset + ir * 2), 270f, 90f, false)
+                }
+                arrayOf(topArc, null, sidePath)
+            }
+            StoneCardPart.MIDDLE -> arrayOf(null, null, null)
+            StoneCardPart.BOTTOM -> {
+                val botArc = Path().apply {
+                    moveTo(inset, 0f)
+                    lineTo(inset, h - inset - ir)
+                    arcTo(Rect(inset, h - inset - ir * 2, inset + ir * 2, h - inset), 180f, -90f, false)
+                    lineTo(w - inset - ir, h - inset)
+                    arcTo(Rect(w - inset - ir * 2, h - inset - ir * 2, w - inset, h - inset), 90f, -90f, false)
+                    lineTo(w - inset, 0f)
+                }
+                arrayOf(null, botArc, null)
+            }
+        }
+    }
+
+    val bevelEdges = buildEdges(bevelIn)
+    val outerEdges = buildEdges(outerW / 2f)
+    val bevelSideStroke = Stroke(width = bevelW)
+    val bevelCapStroke = Stroke(width = bevelW, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val outerSideStroke = Stroke(width = outerW)
+    val outerCapStroke = Stroke(width = outerW, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val bevelIr = (r - bevelIn).coerceAtLeast(2f)
+    val outerIr = (r - outerW / 2f).coerceAtLeast(2f)
+
+    val crackShift = 0.85.dp.toPx()
+    val crackStrokePx = 1.15.dp.toPx()
+    val crackLightStroke = Stroke(width = crackStrokePx * 0.85f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val crackDarkStroke = Stroke(width = crackStrokePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val notchLightStrokePx = 1.1.dp.toPx()
+
+    fun pairCrack(pts: List<Offset>): Pair<Path, Path> {
+        val lp = Path().apply {
+            moveTo(pts[0].x + crackShift, pts[0].y + crackShift)
+            for (i in 1 until pts.size) lineTo(pts[i].x + crackShift, pts[i].y + crackShift)
+        }
+        val dp = Path().apply {
+            moveTo(pts[0].x, pts[0].y)
+            for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
+        }
+        return lp to dp
+    }
+
+    val showTopNotches = part == StoneCardPart.FULL || part == StoneCardPart.TOP
+    val showBotNotches = part == StoneCardPart.FULL || part == StoneCardPart.BOTTOM
+    val xLT = 24.dp.toPx()
+    val yT = outerW * 0.55f
+    val notchLT = if (showTopNotches) Path().apply {
+        moveTo(xLT - 2.6.dp.toPx(), yT); lineTo(xLT + 2.6.dp.toPx(), yT); lineTo(xLT + 0.2.dp.toPx(), yT + 3.4.dp.toPx()); close()
+    } else null
+    val crackTop = if (showTopNotches) {
+        pairCrack(listOf(Offset(xLT + 0.2.dp.toPx(), yT + 3.1.dp.toPx()), Offset(xLT + 2.5.dp.toPx(), yT + 6.4.dp.toPx()), Offset(xLT + 1.0.dp.toPx(), yT + 9.2.dp.toPx())))
+    } else null
+    val notchRT = if (showTopNotches && w > 120.dp.toPx()) {
+        val xRT = w - 26.dp.toPx()
+        Path().apply { moveTo(xRT - 1.9.dp.toPx(), yT); lineTo(xRT + 1.9.dp.toPx(), yT); lineTo(xRT, yT + 2.6.dp.toPx()); close() }
+    } else null
+    val topLineStart = Offset(xLT + 0.2.dp.toPx(), yT + 3.4.dp.toPx())
+    val topLineEnd = Offset(xLT + 3.0.dp.toPx(), yT + 0.4.dp.toPx())
+
+    val xRB = w - 24.dp.toPx()
+    val yB = h - outerW * 0.55f
+    val notchBR = if (showBotNotches) Path().apply {
+        moveTo(xRB - 2.6.dp.toPx(), yB); lineTo(xRB + 2.6.dp.toPx(), yB); lineTo(xRB - 0.2.dp.toPx(), yB - 3.4.dp.toPx()); close()
+    } else null
+    val crackBot = if (showBotNotches) {
+        pairCrack(listOf(Offset(xRB - 0.2.dp.toPx(), yB - 3.1.dp.toPx()), Offset(xRB - 2.5.dp.toPx(), yB - 6.4.dp.toPx()), Offset(xRB - 1.0.dp.toPx(), yB - 9.2.dp.toPx())))
+    } else null
+    val notchBL = if (showBotNotches && w > 120.dp.toPx()) {
+        val xLB = 32.dp.toPx()
+        Path().apply { moveTo(xLB - 1.8.dp.toPx(), yB); lineTo(xLB + 1.8.dp.toPx(), yB); lineTo(xLB, yB - 2.5.dp.toPx()); close() }
+    } else null
+    val botLineStart = Offset(xRB - 3.0.dp.toPx(), yB - 0.4.dp.toPx())
+    val botLineEnd = Offset(xRB - 0.2.dp.toPx(), yB - 3.4.dp.toPx())
+
+    return onDrawBehind {
+        if (faceBrush != null) drawRect(brush = faceBrush) else drawRect(color = middleColor)
+        if (sheenBrush != null) drawRect(brush = sheenBrush, size = sheenSize)
+
+        fun DrawScope.renderEdges(
+            inset: Float,
+            ir: Float,
+            edges: Array<Path?>,
+            sideStroke: Stroke,
+            capStroke: Stroke,
+            topCol: Color,
+            sideCol: Color,
+            botCol: Color,
+            widthPx: Float,
+        ) {
+            when (part) {
+                StoneCardPart.FULL -> {
+                    drawRoundRect(
+                        color = sideCol,
+                        topLeft = Offset(inset, inset),
+                        size = Size(w - inset * 2, h - inset * 2),
+                        cornerRadius = CornerRadius(ir, ir),
+                        style = sideStroke,
+                    )
+                    edges[0]?.let { drawPath(it, topCol, style = capStroke) }
+                    edges[1]?.let { drawPath(it, botCol, style = capStroke) }
+                }
+                StoneCardPart.TOP -> {
+                    edges[2]?.let { drawPath(it, sideCol, style = sideStroke) }
+                    edges[0]?.let { drawPath(it, topCol, style = capStroke) }
+                }
+                StoneCardPart.MIDDLE -> {
+                    drawLine(sideCol, Offset(inset, 0f), Offset(inset, h), strokeWidth = widthPx)
+                    drawLine(sideCol, Offset(w - inset, 0f), Offset(w - inset, h), strokeWidth = widthPx)
+                }
+                StoneCardPart.BOTTOM -> {
+                    edges[1]?.let { drawPath(it, botCol, style = capStroke) }
+                    drawLine(sideCol, Offset(inset, 0f), Offset(inset, h - inset - ir), strokeWidth = widthPx)
+                    drawLine(sideCol, Offset(w - inset, 0f), Offset(w - inset, h - inset - ir), strokeWidth = widthPx)
+                }
+            }
+        }
+
+        renderEdges(bevelIn, bevelIr, bevelEdges, bevelSideStroke, bevelCapStroke, topBevel, sideBevel, botBevel, bevelW)
+
+        if (notchLT != null && crackTop != null) {
+            drawLine(color = crackLight, start = topLineStart, end = topLineEnd, strokeWidth = notchLightStrokePx, cap = StrokeCap.Round)
+            drawPath(notchLT, outerOutline)
+            drawPath(crackTop.first, crackLight, style = crackLightStroke)
+            drawPath(crackTop.second, crackDark, style = crackDarkStroke)
+            notchRT?.let { drawPath(it, outerOutline) }
+        }
+        if (notchBR != null && crackBot != null) {
+            drawLine(color = crackLight, start = botLineStart, end = botLineEnd, strokeWidth = notchLightStrokePx, cap = StrokeCap.Round)
+            drawPath(notchBR, outerOutline)
+            drawPath(crackBot.first, crackLight, style = crackLightStroke)
+            drawPath(crackBot.second, crackDark, style = crackDarkStroke)
+            notchBL?.let { drawPath(it, outerOutline) }
+        }
+
+        renderEdges(outerW / 2f, outerIr, outerEdges, outerSideStroke, outerCapStroke, outerOutline, outerOutline, outerOutline, outerW)
+    }
+}
 
 /**
  * Draws the 3D chiseled stone plaque aesthetic (smooth charcoal/slate stone face, crisp bright
@@ -619,8 +847,8 @@ fun TavernStoneCard(
             .wiggleOnTap()
             .shadow(5.dp, shape)
             .clip(shape)
-            .drawBehind {
-                drawChiseledStoneSurface(pal = pal, highlighted = highlighted, part = StoneCardPart.FULL)
+            .drawWithCache {
+                cacheChiseledStoneSurface(pal = pal, highlighted = highlighted, part = StoneCardPart.FULL)
             }
             .padding(contentPadding),
     ) {
@@ -657,7 +885,7 @@ fun TavernStatShield(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .drawBehind {
+                .drawWithCache {
                     fun shieldPath(inset: Float): Path {
                         val w = size.width - inset * 2
                         val h = size.height - inset * 2
@@ -681,20 +909,18 @@ fun TavernStatShield(
                             close()
                         }
                     }
-                    // Dark outer outline
-                    drawPath(shieldPath(0f), shieldOuter)
-                    // Chiseled bevel border
-                    drawPath(
-                        shieldPath(1.5.dp.toPx()),
-                        Brush.verticalGradient(listOf(shieldRimTop, shieldRimBot)),
-                    )
-                    // Inner dark groove
-                    drawPath(shieldPath(3.5.dp.toPx()), shieldGroove)
-                    // Carved plaque face
-                    drawPath(
-                        shieldPath(5.dp.toPx()),
-                        Brush.verticalGradient(listOf(shieldFaceTop, shieldFaceMid, shieldFaceBot)),
-                    )
+                    val p0 = shieldPath(0f)
+                    val p1 = shieldPath(1.5.dp.toPx())
+                    val p2 = shieldPath(3.5.dp.toPx())
+                    val p3 = shieldPath(5.dp.toPx())
+                    val rimBrush = Brush.verticalGradient(listOf(shieldRimTop, shieldRimBot))
+                    val faceBrush = Brush.verticalGradient(listOf(shieldFaceTop, shieldFaceMid, shieldFaceBot))
+                    onDrawBehind {
+                        drawPath(p0, shieldOuter)
+                        drawPath(p1, rimBrush)
+                        drawPath(p2, shieldGroove)
+                        drawPath(p3, faceBrush)
+                    }
                 }
                 .padding(top = 28.dp, bottom = 14.dp, start = 6.dp, end = 6.dp),
             contentAlignment = Alignment.Center,
@@ -819,7 +1045,35 @@ fun TavernIconFrame(
 enum class TavernBarTone { GREEN, ELIXIR, GOLD }
 
 /**
- * Glossy Recessed Tube Progress Bar with continuous animated wavy crest inside (0% to 100%).
+ * Shared 0f..1f wave cycle phase provided once at screen level so all visible wavy progress bars
+ * share a single 30 FPS draw ticker instead of spawning one InfiniteTransition per card at 120 FPS.
+ */
+internal val LocalWavePhase = compositionLocalOf<State<Float>> { mutableFloatStateOf(0f) }
+
+@Composable
+internal fun rememberSharedWavePhase(active: Boolean): State<Float> {
+    val phase = remember { mutableFloatStateOf(0f) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle, active) {
+        if (!active) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            val cycleMs = 2100L
+            val frameDelayMs = 33L // ~30 FPS keeps smooth wave motion while slashing GPU heat on 120Hz displays
+            var startMs = System.currentTimeMillis() - (phase.floatValue * cycleMs).toLong()
+            while (isActive) {
+                val elapsed = (System.currentTimeMillis() - startMs) % cycleMs
+                phase.floatValue = elapsed.toFloat() / cycleMs.toFloat()
+                delay(frameDelayMs)
+            }
+        }
+    }
+    return phase
+}
+
+/**
+ * Glossy Recessed Tube Progress Bar with precomputed wave geometry and cached Brush gradients.
+ * Only translates the wave Path horizontally inside GPU Draw phase (~30 FPS), zero sin() per frame,
+ * and renders a static polished-crystal finish once 100% completed.
  */
 @Composable
 fun TavernWavyTubeBar(
@@ -832,25 +1086,8 @@ fun TavernWavyTubeBar(
     val displayFrac = maxOf(0.035f, clamped)
     val reduced = rememberReducedMotion()
     val pageActive = LocalPageActiveState.current.value
-    val animateWave = !reduced && pageActive && displayFrac > 0.01f
-    val phase = if (!animateWave) {
-        0f
-    } else {
-        val infinite = rememberInfiniteTransition(label = "tavernWave")
-        infinite.animateFloat(
-            initialValue = 0f,
-            targetValue = (2f * PI).toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1800, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart,
-            ),
-            label = "wavePhase",
-        ).value
-    }
-
-    val troughPath = remember { Path() }
-    val fillPath = remember { Path() }
-    val trackWave = remember { Path() }
+    val animateWave = !reduced && pageActive && displayFrac > 0.01f && clamped < 0.999f
+    val sharedPhase = LocalWavePhase.current
 
     val (fillTop, fillBot, waveCrestColor) = when (tone) {
         TavernBarTone.ELIXIR -> pal.barSecondary
@@ -860,86 +1097,134 @@ fun TavernWavyTubeBar(
 
     val trackRim = pal.barTrackRim
     val trackBg = pal.barTrackBg
-    Canvas(
+    val accentRim = pal.accent
+    val completed = clamped >= 0.999f
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(16.dp),
-    ) {
-        troughPath.reset()
-        fillPath.reset()
-        trackWave.reset()
-        val r = size.height / 2f
-        // 1. Recessed channel + bevel rim
-        drawRoundRect(
-            color = trackRim,
-            cornerRadius = CornerRadius(r, r),
-        )
-        val pad = 1.5.dp.toPx()
-        val innerW = (size.width - pad * 2).coerceAtLeast(4f)
-        val innerH = (size.height - pad * 2).coerceAtLeast(4f)
-        val innerR = innerH / 2f
-        val troughRect = RoundRect(Rect(Offset(pad, pad), Size(innerW, innerH)), CornerRadius(innerR, innerR))
-        troughPath.addRoundRect(troughRect)
+            .height(16.dp)
+            .drawWithCache {
+                val r = size.height / 2f
+                val outerCorner = CornerRadius(r, r)
+                val pad = 1.5.dp.toPx()
+                val innerW = (size.width - pad * 2).coerceAtLeast(4f)
+                val innerH = (size.height - pad * 2).coerceAtLeast(4f)
+                val innerR = innerH / 2f
+                val innerCorner = CornerRadius(innerR, innerR)
 
-        drawRoundRect(
-            color = trackBg,
-            topLeft = Offset(pad, pad),
-            size = Size(innerW, innerH),
-            cornerRadius = CornerRadius(innerR, innerR),
-        )
-
-        clipPath(troughPath) {
-            val fillW = (innerW * displayFrac).coerceAtLeast(innerH)
-            // 2. Base glossy colored fill
-            val fillRect = RoundRect(Rect(Offset(pad, pad), Size(fillW, innerH)), CornerRadius(innerR, innerR))
-            fillPath.addRoundRect(fillRect)
-            drawPath(
-                path = fillPath,
-                brush = Brush.verticalGradient(listOf(fillTop, fillBot), startY = pad, endY = pad + innerH),
-            )
-
-            // 3. Animated sine-wave ribbon running inside the tube + along the full track subtly
-            val waveLen = 34.dp.toPx()
-            val amp = (innerH * 0.23f).coerceAtLeast(1.8f)
-            val cy = pad + innerH * 0.52f
-
-            // Subtle track wave ahead of fill so even low-% bars clearly show the living wave
-            val step = 3.dp.toPx().coerceAtLeast(2f)
-            var x = pad
-            var first = true
-            while (x <= pad + innerW) {
-                val y = cy + amp * sin(((x / waveLen) * 2f * PI.toFloat()) - phase)
-                if (first) {
-                    trackWave.moveTo(x, y)
-                    first = false
-                } else {
-                    trackWave.lineTo(x, y)
+                val troughPath = Path().apply {
+                    addRoundRect(RoundRect(Rect(Offset(pad, pad), Size(innerW, innerH)), innerCorner))
                 }
-                x += step
-            }
-            drawPath(
-                path = trackWave,
-                color = fillTop.copy(alpha = 0.28f),
-                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
-            )
+                val fillW = (innerW * displayFrac).coerceAtLeast(innerH)
+                val fillPath = Path().apply {
+                    addRoundRect(RoundRect(Rect(Offset(pad, pad), Size(fillW, innerH)), innerCorner))
+                }
+                val fillBrush = Brush.verticalGradient(listOf(fillTop, fillBot), startY = pad, endY = pad + innerH)
+                val waveLen = 34.dp.toPx()
 
-            // Bright glowing wave inside the filled tube
-            clipPath(fillPath) {
-                drawPath(
-                    path = trackWave,
-                    color = waveCrestColor.copy(alpha = 0.88f),
-                    style = Stroke(width = 2.6.dp.toPx(), cap = StrokeCap.Round),
-                )
-                // Top specular glass highlight
-                drawRoundRect(
-                    color = Color.White.copy(alpha = 0.28f),
-                    topLeft = Offset(pad + 3.dp.toPx(), pad + 1.5.dp.toPx()),
-                    size = Size((fillW - 6.dp.toPx()).coerceAtLeast(2f), innerH * 0.32f),
-                    cornerRadius = CornerRadius(innerR, innerR),
-                )
-            }
-        }
-    }
+                val crystalSheen = if (completed) {
+                    Path().apply {
+                        val sheenW = 14.dp.toPx()
+                        val slant = innerH * 0.9f
+                        var sx = pad + 18.dp.toPx()
+                        val stepSheen = 52.dp.toPx()
+                        while (sx < pad + fillW) {
+                            moveTo(sx, pad + innerH)
+                            lineTo(sx + slant, pad)
+                            lineTo(sx + slant + sheenW, pad)
+                            lineTo(sx + sheenW, pad + innerH)
+                            close()
+                            sx += stepSheen
+                        }
+                    }
+                } else null
+
+                // Precompute 1 full period before pad so positive translation scrolls smoothly left -> right
+                val longWavePath = if (!completed) {
+                    Path().apply {
+                        val amp = (innerH * 0.23f).coerceAtLeast(1.8f)
+                        val cy = pad + innerH * 0.52f
+                        val step = 4.dp.toPx().coerceAtLeast(2.5f)
+                        var x = pad - waveLen
+                        var first = true
+                        val endX = pad + innerW + step
+                        while (x <= endX) {
+                            val y = cy + amp * sin(((x - pad) / waveLen) * 2f * PI.toFloat())
+                            if (first) {
+                                moveTo(x, y)
+                                first = false
+                            } else {
+                                lineTo(x, y)
+                            }
+                            x += step
+                        }
+                    }
+                } else null
+
+                val bgWaveStroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                val fgWaveStroke = Stroke(width = 2.6.dp.toPx(), cap = StrokeCap.Round)
+                val bgWaveColor = fillTop.copy(alpha = 0.26f)
+                val fgWaveColor = waveCrestColor.copy(alpha = 0.88f)
+                val rimColor = if (completed) accentRim.copy(alpha = 0.85f) else trackRim
+                val sheenColor = Color.White.copy(alpha = 0.14f)
+                val topHighlightW = (fillW - 6.dp.toPx()).coerceAtLeast(2f)
+                val topHighlightOffset = Offset(pad + 3.dp.toPx(), pad + 1.5.dp.toPx())
+                val topHighlightSize = Size(topHighlightW, innerH * if (completed) 0.34f else 0.32f)
+                val topHighlightColor = Color.White.copy(alpha = if (completed) 0.36f else 0.28f)
+                val bottomEdgeColor = waveCrestColor.copy(alpha = 0.65f)
+                val bottomEdgeStart = Offset(pad + 4.dp.toPx(), pad + innerH - 1.5.dp.toPx())
+                val bottomEdgeEnd = Offset(pad + fillW - 4.dp.toPx(), pad + innerH - 1.5.dp.toPx())
+                val bottomEdgeStroke = 1.6.dp.toPx()
+
+                onDrawBehind {
+                    drawRoundRect(color = rimColor, cornerRadius = outerCorner)
+                    drawRoundRect(
+                        color = trackBg,
+                        topLeft = Offset(pad, pad),
+                        size = Size(innerW, innerH),
+                        cornerRadius = innerCorner,
+                    )
+                    clipPath(troughPath) {
+                        drawPath(path = fillPath, brush = fillBrush)
+                        if (completed) {
+                            clipPath(fillPath) {
+                                crystalSheen?.let { drawPath(path = it, color = sheenColor) }
+                                drawRoundRect(
+                                    color = topHighlightColor,
+                                    topLeft = topHighlightOffset,
+                                    size = topHighlightSize,
+                                    cornerRadius = innerCorner,
+                                )
+                                drawLine(
+                                    color = bottomEdgeColor,
+                                    start = bottomEdgeStart,
+                                    end = bottomEdgeEnd,
+                                    strokeWidth = bottomEdgeStroke,
+                                    cap = StrokeCap.Round,
+                                )
+                            }
+                        } else if (longWavePath != null) {
+                            val shiftPx = if (animateWave) sharedPhase.value * waveLen else 0f
+                            translate(left = shiftPx, top = 0f) {
+                                drawPath(path = longWavePath, color = bgWaveColor, style = bgWaveStroke)
+                            }
+                            clipPath(fillPath) {
+                                translate(left = shiftPx, top = 0f) {
+                                    drawPath(path = longWavePath, color = fgWaveColor, style = fgWaveStroke)
+                                }
+                                drawRoundRect(
+                                    color = topHighlightColor,
+                                    topLeft = topHighlightOffset,
+                                    size = topHighlightSize,
+                                    cornerRadius = innerCorner,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+    )
 }
 
 /**

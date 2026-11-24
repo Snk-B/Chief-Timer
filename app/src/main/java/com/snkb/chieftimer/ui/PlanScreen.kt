@@ -24,9 +24,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -36,16 +39,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -62,6 +67,7 @@ import com.snkb.chieftimer.core.WidgetModel
 import com.snkb.chieftimer.data.MaxDataStore
 import com.snkb.chieftimer.data.Names
 import com.snkb.chieftimer.sync.SleepStore
+import com.snkb.chieftimer.sync.SyncRunner
 import com.snkb.chieftimer.ui.theme.LocalChiefPalette
 import com.snkb.chieftimer.ui.theme.TavernGold
 import com.snkb.chieftimer.ui.theme.TavernGoldDark
@@ -74,6 +80,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private data class NamedPlanCandidate(val name: String, val item: PlanCandidate)
@@ -89,8 +96,10 @@ private data class SlotPlanState(
 @Composable
 internal fun PlanPage(export: VillageExport?, model: WidgetModel, now: Long, page: Int) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val dataVersion = MaxDataStore.version
     var window by remember { mutableStateOf(SleepStore.get(context)) }
+    var sleepAlert by remember { mutableStateOf(SleepStore.alertEnabled(context)) }
     val zone = remember { ZoneId.systemDefault() }
     var filter by remember { mutableStateOf(PlanFilter()) }
     val locale = Locale.getDefault()
@@ -135,6 +144,17 @@ internal fun PlanPage(export: VillageExport?, model: WidgetModel, now: Long, pag
         }
     }
 
+    if (page == 0 && export != null && model.hasData) {
+        RoadToMaxCard(
+            export = export,
+            builders = model.buildersTotal,
+            playerName = model.playerName,
+            accountTag = model.accountTag,
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = listPadding(),
@@ -158,16 +178,24 @@ internal fun PlanPage(export: VillageExport?, model: WidgetModel, now: Long, pag
             }
             return@LazyColumn
         }
-        if (page == 0) {
-            item(key = "road_to_max") { RoadToMaxCard(export, model.buildersTotal) }
-            return@LazyColumn
-        }
         item(key = "sleep_card") {
             Box(Modifier.padding(bottom = 12.dp)) {
-                SleepCard(window) {
-                    window = it
-                    SleepStore.set(context, it)
-                }
+                SleepCard(
+                    window = window,
+                    alertEnabled = sleepAlert,
+                    onChange = {
+                        window = it
+                        SleepStore.set(context, it)
+                        if (sleepAlert) {
+                            scope.launch { SyncRunner.refreshWidgets(context.applicationContext, "settings") }
+                        }
+                    },
+                    onAlertChange = { enabled ->
+                        sleepAlert = enabled
+                        SleepStore.setAlertEnabled(context, enabled)
+                        scope.launch { SyncRunner.refreshWidgets(context.applicationContext, "settings") }
+                    },
+                )
             }
         }
         item(key = "filter_card") {
@@ -300,7 +328,13 @@ private fun timeText(minutes: Int): String =
     LocalTime.of(minutes / 60, minutes % 60).format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
 
 @Composable
-private fun SleepCard(window: SleepWindow, onChange: (SleepWindow) -> Unit) {
+private fun SleepCard(
+    window: SleepWindow,
+    alertEnabled: Boolean,
+    onChange: (SleepWindow) -> Unit,
+    onAlertChange: (Boolean) -> Unit,
+) {
+    val pal = LocalChiefPalette.current
     var editing by remember { mutableStateOf<Boolean?>(null) }
     TavernWoodBanner {
         ClashOutlinedText(
@@ -327,6 +361,37 @@ private fun SleepCard(window: SleepWindow, onChange: (SleepWindow) -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFFFFECC2).copy(alpha = 0.9f),
         )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = alertEnabled,
+                    role = Role.Switch,
+                    onValueChange = onAlertChange,
+                )
+                .padding(top = 2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.bedtime_alert_enable),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFFFECC2),
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = alertEnabled,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = pal.pillActiveText,
+                    checkedTrackColor = pal.pillActiveTop,
+                    checkedBorderColor = pal.accentLight,
+                    uncheckedThumbColor = Color(0xFFD0C4B4),
+                    uncheckedTrackColor = pal.barTrackBg,
+                    uncheckedBorderColor = pal.cardBorder,
+                ),
+            )
+        }
     }
     editing?.let { isStart ->
         TimeDialog(
@@ -437,8 +502,8 @@ private fun SlotSectionHeaderItem(slot: PlanSlot, waiting: Boolean, freeClockTex
         modifier = Modifier
             .fillMaxWidth()
             .clip(SlotTopShape)
-            .drawBehind {
-                drawChiseledStoneSurface(pal = pal, highlighted = false, part = StoneCardPart.TOP)
+            .drawWithCache {
+                cacheChiseledStoneSurface(pal = pal, highlighted = false, part = StoneCardPart.TOP)
             }
             .padding(top = 14.dp, bottom = 10.dp),
     ) {
@@ -454,8 +519,8 @@ private fun CandidateSectionRow(name: String, item: PlanCandidate, doneText: Str
         .fillMaxWidth()
         .padding(bottom = if (isLast) 12.dp else 0.dp)
         .let { m -> if (isLast) m.clip(SlotBotShape) else m }
-        .drawBehind {
-            drawChiseledStoneSurface(
+        .drawWithCache {
+            cacheChiseledStoneSurface(
                 pal = pal,
                 highlighted = false,
                 part = if (isLast) StoneCardPart.BOTTOM else StoneCardPart.MIDDLE,

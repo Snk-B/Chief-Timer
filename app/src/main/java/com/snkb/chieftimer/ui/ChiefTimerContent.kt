@@ -73,6 +73,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,7 +89,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -147,16 +150,23 @@ private enum class Page(val dest: Destination, @StringRes val labelRes: Int?) {
 private val SubTabsHeight = 48.dp
 
 /**
- * Slides to [target]. A far page is reached with a single slide: the pager first jumps next to it,
- * then slides the last page, instead of sweeping past every page in between.
+ * Slides to [target]. A neighbouring page slides on [spec]. A far page does not sweep past (or flash through)
+ * the pages in between: the pager fades out, jumps, and fades back in.
  */
-private suspend fun PagerState.goTo(target: Int, spec: AnimationSpec<Float>) {
+private suspend fun PagerState.goTo(
+    target: Int,
+    spec: AnimationSpec<Float>,
+    fade: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+) {
     val from = currentPage
+    if (target == from) return
     if (abs(target - from) > 1) {
-        scrollToPage(if (target > from) target - 1 else target + 1)
-        withFrameNanos { }
+        fade.animateTo(0f, tween(90))
+        scrollToPage(target)
+        fade.animateTo(1f, tween(160))
+    } else {
+        animateScrollToPage(target, animationSpec = spec)
     }
-    animateScrollToPage(target, animationSpec = spec)
 }
 
 private fun Destination.firstPage(): Int = Page.entries.indexOfFirst { it.dest == this }
@@ -189,11 +199,15 @@ fun ChiefTimerContent(
     var developerOpen by developerOpenState
     val tapScope = rememberCoroutineScope()
     val pager = rememberPagerState { Page.entries.size }
+    val pagerFade = remember { Animatable(1f) }
     val currentPage by remember { derivedStateOf { Page.entries[pager.currentPage] } }
     val destination by remember { derivedStateOf { currentPage.dest } }
     val reduced = rememberReducedMotion()
+    val powerSave = rememberPowerSaveMode()
+    val waveActive = !reduced && !settings.ecoAnimations && !powerSave && (currentPage == Page.TIMERS || currentPage == Page.PLAN_ROAD) && !pager.isScrollInProgress
+    val sharedWavePhase = rememberSharedWavePhase(active = waveActive)
     val pageSpring = remember(reduced) {
-        if (reduced) tween<Float>(180) else spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)
+        if (reduced) tween<Float>(180) else spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 560f)
     }
     val barState = rememberTavernBarScrollState(pager)
     val floatingOn = settings.floatingTabBar
@@ -213,7 +227,7 @@ fun ChiefTimerContent(
         barState.show()
         val targetPage = entry.firstPage()
         if (pager.currentPage != targetPage || pager.currentPageOffsetFraction != 0f) {
-            tapScope.launch { pager.goTo(targetPage, pageSpring) }
+            tapScope.launch { pager.goTo(targetPage, pageSpring, pagerFade) }
         }
         if (entry == Destination.SETTINGS && !developerOpenState.value) {
             val t = System.currentTimeMillis()
@@ -243,7 +257,7 @@ fun ChiefTimerContent(
     val backEnabled by remember { derivedStateOf { pager.currentPage != 0 } }
     BackHandler(enabled = backEnabled) {
         barState.show()
-        tapScope.launch { pager.goTo(0, pageSpring) }
+        tapScope.launch { pager.goTo(0, pageSpring, pagerFade) }
     }
 
     val pal = LocalChiefPalette.current
@@ -307,7 +321,10 @@ fun ChiefTimerContent(
                     TavernSideNavRail(current = destination, onSelect = onNavigate)
                 }
                 Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                    CompositionLocalProvider(LocalBarInset provides barReserve) {
+                    CompositionLocalProvider(
+                        LocalBarInset provides barReserve,
+                        LocalWavePhase provides sharedWavePhase,
+                    ) {
                         Box(
                             Modifier
                                 .widthIn(max = 840.dp)
@@ -317,10 +334,12 @@ fun ChiefTimerContent(
                         ) {
                             HorizontalPager(
                                 state = pager,
-                                modifier = Modifier.fillMaxSize(),
-                                beyondViewportPageCount = 1,
+                                key = { Page.entries[it].ordinal },
+                                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = pagerFade.value },
+                                beyondViewportPageCount = 2,
                                 flingBehavior = PagerDefaults.flingBehavior(
                                     state = pager,
+                                    snapPositionalThreshold = 0.22f,
                                     snapAnimationSpec = pageSpring,
                                 ),
                             ) { index ->
@@ -337,6 +356,7 @@ fun ChiefTimerContent(
                                         screenState.SaveableStateProvider(page) {
                                             when (page) {
                                                 Page.TIMERS -> TimersPageHost(
+                                                    state = state,
                                                     nowState = nowState,
                                                     buildModel = buildModel,
                                                     lastSync = log.lastResult,
@@ -380,14 +400,22 @@ fun ChiefTimerContent(
                                     }
                                 }
                             }
-                            if (hasSubTabs) {
+                            var cachedSubPages by remember { mutableStateOf(subPages) }
+                            if (hasSubTabs) cachedSubPages = subPages
+                            val subVisibleAlpha by animateFloatAsState(
+                                targetValue = if (hasSubTabs) 1f else 0f,
+                                animationSpec = if (reduced) tween(100) else tween(160),
+                                label = "subTabAlpha",
+                            )
+                            if (cachedSubPages.size > 1 && subVisibleAlpha > 0.01f) {
                                 TavernSubTabStrip(
-                                    subPages = subPages,
+                                    subPages = cachedSubPages,
                                     currentSubPage = currentPage,
-                                    hideFraction = if (!floating || reduced) 0f else subHide.value,
+                                    hideFraction = if (!floating || reduced) (1f - subVisibleAlpha) else maxOf(subHide.value, 1f - subVisibleAlpha),
+                                    interactive = hasSubTabs,
                                     onSelectSubPage = { p ->
                                         barState.show()
-                                        tapScope.launch { pager.goTo(p.ordinal, pageSpring) }
+                                        tapScope.launch { pager.goTo(p.ordinal, pageSpring, pagerFade) }
                                     },
                                     modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
                                 )
@@ -413,6 +441,7 @@ fun ChiefTimerContent(
 
 @Composable
 private fun TimersPageHost(
+    state: AppState,
     nowState: State<Long>,
     buildModel: (Long) -> WidgetModel,
     lastSync: SyncLogEntry?,
@@ -430,13 +459,37 @@ private fun TimersPageHost(
     export: VillageExport?,
 ) {
     val active = LocalPageActiveState.current.value
-    var displayNow by remember { mutableLongStateOf(nowState.value) }
-    LaunchedEffect(active, nowState) {
+    val displayNowState = remember { mutableLongStateOf(nowState.value) }
+    var cachedModel by remember { mutableStateOf(buildModel(displayNowState.longValue)) }
+    var modelBuiltAt by remember { mutableLongStateOf(displayNowState.longValue) }
+    var lastBuilder by remember { mutableStateOf(buildModel) }
+    LaunchedEffect(active, buildModel, nowState) {
+        val currentNow = nowState.value
+        displayNowState.longValue = currentNow
+        if (lastBuilder !== buildModel ||
+            currentNow < modelBuiltAt ||
+            currentNow - modelBuiltAt >= 30L ||
+            (cachedModel.nextChangeAt?.let { currentNow >= it } == true)
+        ) {
+            cachedModel = buildModel(currentNow)
+            modelBuiltAt = currentNow
+            lastBuilder = buildModel
+        }
         if (active) {
-            snapshotFlow { nowState.value }.collect { displayNow = it }
+            snapshotFlow { nowState.value }.collect { now ->
+                displayNowState.longValue = now
+                val nextEdge = cachedModel.nextChangeAt
+                if (now < modelBuiltAt ||
+                    now - modelBuiltAt >= 30L ||
+                    (nextEdge != null && now >= nextEdge)
+                ) {
+                    cachedModel = buildModel(now)
+                    modelBuiltAt = now
+                }
+            }
         }
     }
-    val model = remember(buildModel, displayNow) { buildModel(displayNow) }
+    val model = cachedModel
     TimerDashboard(
         model = model,
         lastSync = lastSync,
@@ -444,7 +497,7 @@ private fun TimersPageHost(
         eventSettings = eventSettings,
         accounts = accounts,
         selectedTag = selectedTag,
-        now = displayNow,
+        nowState = displayNowState,
         busy = busy,
         onSync = onSync,
         onUpdateBoosts = { transform ->
@@ -458,6 +511,7 @@ private fun TimersPageHost(
         onDeleteAccount = onDeleteAccount,
         wide = wide,
         export = export,
+        appState = state,
     )
 }
 
@@ -506,7 +560,18 @@ private fun TavernTopHeaderBar(
     val barBg = rememberChromeBgBrush(pal) { listOf(pal.headerBgTop, pal.headerBgMid, pal.headerBgBot) }
     val topGlow = pal.accentLight.copy(alpha = if (useTextures) 0.16f else 0.09f)
     val context = LocalContext.current
+    val density = LocalDensity.current
     val failedMsg = stringResource(R.string.open_game_failed)
+    val latestOnOpenGameFailed by rememberUpdatedState(onOpenGameFailed)
+    val showChip = showAccountSwitcher && accounts.isNotEmpty()
+    val animSpec = remember(reduced) {
+        if (reduced) tween<Float>(90) else spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 560f)
+    }
+    val chipProgress by animateFloatAsState(targetValue = if (showChip) 1f else 0f, animationSpec = animSpec, label = "headerChip")
+    val openProgress by animateFloatAsState(targetValue = if (showOpenGame) 1f else 0f, animationSpec = animSpec, label = "headerOpen")
+    var openWidthPx by remember { mutableIntStateOf(0) }
+    val gapPx = with(density) { 8.dp.toPx() }
+    val slideOutPx = with(density) { 28.dp.toPx() }
 
     Column(
         Modifier
@@ -514,30 +579,30 @@ private fun TavernTopHeaderBar(
             .fillMaxWidth()
             .shadow(6.dp)
             .background(barBg)
-            .drawBehind {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        when (pal.mode) {
-                            ChiefThemeMode.CLASH -> listOf(Color(0x22FFE29E), Color.Transparent, Color(0x3A120802))
-                            ChiefThemeMode.DARK -> listOf(Color(0x168BA0C4), Color.Transparent, Color(0x3E05070B))
-                            else -> listOf(topGlow, Color.Transparent, Color(0x66020306))
-                        },
-                    ),
+            .drawWithCache {
+                val sheen = Brush.verticalGradient(
+                    when (pal.mode) {
+                        ChiefThemeMode.CLASH -> listOf(Color(0x22FFE29E), Color.Transparent, Color(0x3A120802))
+                        ChiefThemeMode.DARK -> listOf(Color(0x168BA0C4), Color.Transparent, Color(0x3E05070B))
+                        else -> listOf(topGlow, Color.Transparent, Color(0x66020306))
+                    },
                 )
+                onDrawBehind { drawRect(brush = sheen) }
             },
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SlideSwitcher(
                 index = destination.ordinal,
                 reduced = reduced,
-                modifier = Modifier.weight(1f).titleEasterEgg(),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth()
+                    .titleEasterEgg(),
             ) { i ->
                 val shown = Destination.entries[i]
                 ClashOutlinedText(
@@ -548,31 +613,60 @@ private fun TavernTopHeaderBar(
                 )
             }
 
-            if (showAccountSwitcher && accounts.isNotEmpty()) {
-                HeaderAccountChip(
-                    accounts = accounts,
-                    selectedTag = selectedTag,
-                    onSelect = onSelectAccount,
-                    onRename = onRenameAccount,
-                    onDelete = onDeleteAccount,
-                    onSyncNewAccount = onSyncNewAccount,
-                    onOpenGameFailed = { onOpenGameFailed(failedMsg) },
-                )
-            }
-
-            AnimatedVisibility(
-                visible = showOpenGame,
-                enter = if (reduced) fadeIn(tween(0)) else fadeIn(tween(180)) + slideInHorizontally { it / 2 },
-                exit = if (reduced) fadeOut(tween(0)) else fadeOut(tween(150)) + slideOutHorizontally { it / 2 },
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OpenGameButton(onClick = {
-                    if (CompanionPrefs.enabled(context) && CompanionPrefs.overlayAllowed(context)) {
-                        CompanionService.activateManual(context, immediate = false)
+                if (accounts.isNotEmpty()) {
+                    Box(
+                        Modifier
+                            .zIndex(if (showOpenGame) 0f else 1f)
+                            .graphicsLayer {
+                                alpha = chipProgress
+                                val scale = 0.88f + 0.12f * chipProgress
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = ((1f - openProgress) * (openWidthPx + gapPx)) + ((1f - chipProgress) * slideOutPx)
+                            },
+                    ) {
+                        HeaderAccountChip(
+                            accounts = accounts,
+                            selectedTag = selectedTag,
+                            enabled = showChip,
+                            onSelect = onSelectAccount,
+                            onRename = onRenameAccount,
+                            onDelete = onDeleteAccount,
+                            onSyncNewAccount = onSyncNewAccount,
+                            onOpenGameFailed = { latestOnOpenGameFailed(failedMsg) },
+                        )
                     }
-                    if (!openGameLink(context, CLASH_MORE_SETTINGS_LINK)) {
-                        onOpenGameFailed(failedMsg)
-                    }
-                })
+                }
+
+                Box(
+                    Modifier
+                        .onSizeChanged { openWidthPx = it.width }
+                        .graphicsLayer {
+                            alpha = openProgress
+                            val scale = 0.88f + 0.12f * openProgress
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = (1f - openProgress) * slideOutPx
+                        },
+                ) {
+                    OpenGameButton(
+                        enabled = showOpenGame,
+                        onClick = {
+                            if (!showOpenGame) return@OpenGameButton
+                            if (CompanionPrefs.enabled(context) && CompanionPrefs.overlayAllowed(context)) {
+                                CompanionService.activateManual(context, immediate = false)
+                            }
+                            if (!openGameLink(context, CLASH_MORE_SETTINGS_LINK)) {
+                                latestOnOpenGameFailed(failedMsg)
+                            }
+                        },
+                    )
+                }
             }
         }
 
@@ -595,6 +689,7 @@ private fun TavernSubTabStrip(
     subPages: List<Page>,
     currentSubPage: Page,
     hideFraction: Float,
+    interactive: Boolean = true,
     onSelectSubPage: (Page) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -630,7 +725,7 @@ private fun TavernSubTabStrip(
                 TavernFilterPill(
                     label = stringResource(p.labelRes!!),
                     selected = currentSubPage == p,
-                    onClick = { onSelectSubPage(p) },
+                    onClick = { if (interactive) onSelectSubPage(p) },
                 )
             }
         }
@@ -647,6 +742,7 @@ private fun TavernSubTabStrip(
 internal fun HeaderAccountChip(
     accounts: List<AccountMeta>,
     selectedTag: String?,
+    enabled: Boolean = true,
     onSelect: (String) -> Unit,
     onRename: (String, String) -> Unit,
     onDelete: (String) -> Unit,
@@ -665,18 +761,40 @@ internal fun HeaderAccountChip(
 
     val pal = LocalChiefPalette.current
     val shape = RoundedCornerShape(9.dp)
+    val chipOuter = pal.chipOuter
+    val rimTop = pal.chipRimTop
+    val rimBot = pal.chipRimBot
+    val fillTop = pal.chipFillTop
+    val fillBot = pal.chipFillBot
     Box(
         modifier = Modifier
             .heightIn(min = 38.dp)
             .clip(shape)
-            .background(pal.chipOuter)
-            .padding(1.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Brush.verticalGradient(listOf(pal.chipRimTop, pal.chipRimBot)))
-            .padding(1.dp)
-            .clip(RoundedCornerShape(7.dp))
-            .background(Brush.verticalGradient(listOf(pal.chipFillTop, pal.chipFillBot)))
-            .clickable(role = Role.Button) { sheetOpen = true }
+            .drawWithCache {
+                val r9 = 9.dp.toPx()
+                val r8 = 8.dp.toPx()
+                val r7 = 7.dp.toPx()
+                val p1 = 1.dp.toPx()
+                val p2 = 2.dp.toPx()
+                val rimBrush = Brush.verticalGradient(listOf(rimTop, rimBot))
+                val fillBrush = Brush.verticalGradient(listOf(fillTop, fillBot))
+                onDrawBehind {
+                    drawRoundRect(chipOuter, cornerRadius = CornerRadius(r9, r9))
+                    drawRoundRect(
+                        brush = rimBrush,
+                        topLeft = Offset(p1, p1),
+                        size = Size(size.width - p1 * 2, size.height - p1 * 2),
+                        cornerRadius = CornerRadius(r8, r8),
+                    )
+                    drawRoundRect(
+                        brush = fillBrush,
+                        topLeft = Offset(p2, p2),
+                        size = Size(size.width - p2 * 2, size.height - p2 * 2),
+                        cornerRadius = CornerRadius(r7, r7),
+                    )
+                }
+            }
+            .let { m -> if (enabled) m.clickable(role = Role.Button) { sheetOpen = true } else m }
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {

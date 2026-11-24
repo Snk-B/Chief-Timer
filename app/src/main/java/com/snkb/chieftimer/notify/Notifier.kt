@@ -31,12 +31,12 @@ import kotlin.math.roundToInt
 /** "Builder free: Inferno Tower" / "Lab free" / "Pet house free" + Android 16/17 & Samsung One UI Live Pill. */
 object Notifier {
     /** Plays on the alarm volume and breaks through Do Not Disturb (the original channel, kept for existing users). */
-    const val CHANNEL_ID = "finished_v2"
+    const val CHANNEL_ID = "finished_v4"
     /** Plays on the notification volume and is silenced by Do Not Disturb. */
-    const val CHANNEL_QUIET = "finished_v3"
+    const val CHANNEL_QUIET = "finished_v5"
     /** Clock Tower ready: its own sound, one channel per Do Not Disturb choice (a channel's sound can't change once created). */
-    const val CHANNEL_CLOCK = "clocktower_v1"
-    const val CHANNEL_CLOCK_QUIET = "clocktower_v1_quiet"
+    const val CHANNEL_CLOCK = "clocktower_v2"
+    const val CHANNEL_CLOCK_QUIET = "clocktower_v2_quiet"
     /** Silent high-priority channel for Live Countdown Notifications / Samsung Status Bar Pill & Now Bar. */
     const val CHANNEL_LIVE = "live_countdown_v1"
     /** Vibrant Clash Tavern Orange for the Status Bar Live Pill, Now Bar badge & progress bar. */
@@ -44,7 +44,12 @@ object Notifier {
 
     private const val PREFS = "notif_prefs"
     private const val KEY_RESPECT_DND = "respect_dnd"
+    private const val KEY_HOME = "alerts_home"
+    private const val KEY_BUILDER_BASE = "alerts_builder_base"
+    private const val KEY_HELPERS = "alerts_helpers"
     private const val OLD_CHANNEL_ID = "finished"
+    /** Channels made for earlier sound files: a channel keeps the sound it was created with, so a new file needs a new id. */
+    private val RETIRED = listOf("finished_v2", "finished_v3", "clocktower_v1", "clocktower_v1_quiet")
     private const val CLASH_PACKAGE = "com.supercell.clashofclans"
 
     data class LiveCountdownItem(
@@ -70,10 +75,34 @@ object Notifier {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_RESPECT_DND, on).apply()
     }
 
+    /** Finish alerts for the home village (default on) and for the Builder Base (default on), switched separately. */
+    fun homeAlerts(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_HOME, true)
+
+    fun builderBaseAlerts(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_BUILDER_BASE, true)
+
+    fun setHomeAlerts(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_HOME, on).apply()
+    }
+
+    fun setBuilderBaseAlerts(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_BUILDER_BASE, on).apply()
+    }
+
+    /** Optional alert when Apprentice Builder / Lab Assistant / Alchemist cooldown ends (default on). */
+    fun helperAlerts(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_HELPERS, true)
+
+    fun setHelperAlerts(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_HELPERS, on).apply()
+    }
+
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         val lctx = com.snkb.chieftimer.locale.LanguageManager.wrap(context)
         nm.deleteNotificationChannel(OLD_CHANNEL_ID)
+        RETIRED.forEach { nm.deleteNotificationChannel(it) }
         if (nm.getNotificationChannel(CHANNEL_QUIET) == null) {
             val quiet = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -412,6 +441,21 @@ object Notifier {
             }
         }
         return true
+    }
+
+    /** Developer sound check: one sample notification on the given channel (ids 7201+ keep them from replacing each other). */
+    fun test(context: Context, channel: String, title: String, id: Int): Boolean {
+        if (!allowed(context)) return false
+        ensureChannel(context)
+        val n = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_stat_timer)
+            .setContentTitle(title)
+            .setContentText("Sound check")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(openIntent(context))
+            .build()
+        return try { NotificationManagerCompat.from(context).notify(id, n); true } catch (_: SecurityException) { false }
     }
 
     /** Tapping a notification opens Clash of Clans if it's installed, otherwise this app. */

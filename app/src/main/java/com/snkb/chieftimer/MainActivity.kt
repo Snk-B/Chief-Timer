@@ -82,6 +82,9 @@ class MainActivity : ComponentActivity() {
         )
         syncRequestHandled = savedInstanceState != null
         val playSplash = savedInstanceState == null
+        intent?.getStringExtra(EXTRA_SELECT_TAG)?.let { tag ->
+            lifecycleScope.launch { rootSelectTag(tag) }
+        }
         com.snkb.chieftimer.update.UpdateCheckJob.sync(this)
         if (savedInstanceState == null) {
             if (!com.snkb.chieftimer.update.Connectivity.isOnline(this)) {
@@ -115,10 +118,15 @@ class MainActivity : ComponentActivity() {
         com.snkb.chieftimer.companion.CompanionService.onHostResumed(this)
     }
 
+    private fun rootSelectTag(tag: String) {
+        lifecycleScope.launch { runCatching { StateRepository(applicationContext).selectAccount(tag) } }
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         syncRequested = intent.getBooleanExtra(EXTRA_SYNC_NOW, false)
+        intent.getStringExtra(EXTRA_SELECT_TAG)?.let { rootSelectTag(it) }
     }
 
     /** Android 10+ only lets the focused app read the clipboard, so the check waits for window focus. */
@@ -147,6 +155,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_SYNC_NOW = "sync_now"
+        const val EXTRA_SELECT_TAG = "select_tag"
     }
 }
 
@@ -173,6 +182,7 @@ private fun ChiefTimerApp() {
     LaunchedEffect(Unit) { repo.backfillTownHall() }
     LaunchedEffect(Unit) {
         val app = context.applicationContext
+        runCatching { com.snkb.chieftimer.ui.GameIconCache.warmUp(app) }
         withContext(Dispatchers.IO) {
             runCatching { com.snkb.chieftimer.data.MaxDataStore.get(app) }
             runCatching { com.snkb.chieftimer.update.EventsStore.load(app) }
@@ -194,8 +204,9 @@ private fun ChiefTimerApp() {
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
-                nowState.longValue = System.currentTimeMillis() / 1000
-                delay(1_000)
+                val nowMs = System.currentTimeMillis()
+                nowState.longValue = nowMs / 1_000L
+                delay(1_005L - (nowMs % 1_000L))
             }
         }
     }

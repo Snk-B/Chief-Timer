@@ -58,6 +58,10 @@ object WidgetTexts {
             builderStillFreeText = r.getString(R.string.notif_idle_builder_text),
             clockTowerTitle = r.getString(R.string.notif_clock_ready_title),
             clockTowerText = r.getString(R.string.notif_clock_ready_text),
+            helperReadyTitle = r.getString(R.string.notif_helper_ready_title),
+            helperReadyText = r.getString(R.string.notif_helper_ready_text),
+            bedtimeTitle = r.getString(R.string.notif_bedtime_title),
+            bedtimeText = r.getString(R.string.notif_bedtime_text),
         )
     }
 }

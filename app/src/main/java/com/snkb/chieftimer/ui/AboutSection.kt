@@ -135,13 +135,6 @@ fun AboutSection(reportProvider: () -> String = { "" }) {
                         color = TavernGreenLight,
                         strokeWidth = 3.8f,
                     )
-                    if (u.info.notes.isNotBlank()) {
-                        Text(
-                            u.info.notes.take(600),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFFFF0D4),
-                        )
-                    }
                     val canInstall = rememberCanInstallPackage()
                     if (canInstall) {
                         UpdateActionButton(R.string.update_download_install, ClashButtonStyle.GOLD) { install(u.info) }

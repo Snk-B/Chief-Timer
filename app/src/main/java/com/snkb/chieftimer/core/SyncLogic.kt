@@ -64,8 +64,37 @@ object SyncLogic {
                     // identical upgrades after the first finished); never shrink the bar's length.
                     job.key to maxOf(old.firstRemaining[job.key] ?: 0L, job.remainingAtT0)
                 },
+                activeBoosts = old.activeBoosts,
+                eventSettings = old.eventSettings,
+                lastDiff = computeDiff(previous, export),
             ),
             export,
+        )
+    }
+
+    /** Summarizes started/finished upgrades and gained levels/walls since [previous] sync. */
+    fun computeDiff(previous: VillageExport?, current: VillageExport): SyncDiff? {
+        if (previous == null) return null
+        val oldKeys = previous.jobs.mapTo(HashSet()) { it.key }
+        val newKeys = current.jobs.mapTo(HashSet()) { it.key }
+        val started = (newKeys - oldKeys).size
+        val finished = (oldKeys - newKeys).size
+        var wallsUpgraded = 0
+        var levelsGained = 0
+        for ((id, levels) in current.ownedLevels) {
+            val prevSum = previous.ownedLevels[id]?.sum() ?: 0
+            val currSum = levels.sum()
+            val delta = (currSum - prevSum).coerceAtLeast(0)
+            if (delta > 0) {
+                if (id == 1000010) wallsUpgraded += delta else levelsGained += delta
+            }
+        }
+        return SyncDiff(
+            at = current.timestamp,
+            started = started,
+            finished = finished,
+            levelsGained = levelsGained,
+            wallsUpgraded = wallsUpgraded,
         )
     }
 

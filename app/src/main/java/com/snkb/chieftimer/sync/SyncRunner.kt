@@ -89,6 +89,25 @@ object SyncRunner {
                 val outcome = repo.syncVillage(tag, export, clipboard)
 
                 val ok = outcome is SyncLogic.Outcome.Synced
+                if (ok) {
+                    runCatching {
+                        val maxData = com.snkb.chieftimer.data.MaxDataStore.get(app)
+                        com.snkb.chieftimer.core.RoadToMaxCalc.compute(maxData, export)?.let { road ->
+                            val overallPct = ((road.work.overall ?: 1.0) * 100).toInt().coerceIn(0, 100)
+                            val wallsPct = ((road.work.walls.done ?: 1.0) * 100).toInt().coerceIn(0, 100)
+                            repo.appendVillageSnapshot(
+                                tag,
+                                com.snkb.chieftimer.core.VillageSnapshot(
+                                    at = export.timestamp,
+                                    townHall = road.townHall,
+                                    overallPct = overallPct,
+                                    wallsPct = wallsPct,
+                                    builderHoursLeft = road.builderWork.seconds / 3600L,
+                                ),
+                            )
+                        }
+                    }
+                }
                 Result(ok, plainText(outcome.describe(context, Names.get(app))))
             }
         } catch (t: Throwable) {

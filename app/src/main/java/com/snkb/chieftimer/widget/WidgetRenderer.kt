@@ -220,7 +220,14 @@ class WidgetRenderer(private val context: Context) {
         rv.setPendingIntentTemplate(R.id.list, tapTemplate())
     }
 
-    fun render(model: WidgetModel, liveCountdown: Boolean, options: Bundle?, style: String = "list", appWidgetId: Int = 0): RemoteViews {
+    fun render(
+        model: WidgetModel,
+        liveCountdown: Boolean,
+        options: Bundle?,
+        style: String = "list",
+        appWidgetId: Int = 0,
+        multipleAccounts: Boolean = false,
+    ): RemoteViews {
         val resolvedStyle = if (style == com.snkb.chieftimer.data.StateRepository.WIDGET_STYLE_TILES) {
             com.snkb.chieftimer.data.StateRepository.WIDGET_STYLE_TILES
         } else {
@@ -230,17 +237,18 @@ class WidgetRenderer(private val context: Context) {
         val heightDp = reportedHeightDp(options) ?: 320
         val isSmall = heightDp < 185
         if (resolvedStyle == com.snkb.chieftimer.data.StateRepository.WIDGET_STYLE_TILES) {
-            return renderLarge(model, liveCountdown, options, appWidgetId)
+            return renderLarge(model, liveCountdown, options, appWidgetId, multipleAccounts)
         }
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val smallSize = android.util.SizeF(250f, 130f)
             val largeSize = android.util.SizeF(250f, 320f)
-            val smallRv = renderSmall(model, liveCountdown, options, appWidgetId)
-            val largeRv = renderLarge(model, liveCountdown, options, appWidgetId)
+            val smallRv = renderSmall(model, liveCountdown, options, appWidgetId, multipleAccounts)
+            val largeRv = renderLarge(model, liveCountdown, options, appWidgetId, multipleAccounts)
             RemoteViews(mapOf(smallSize to smallRv, largeSize to largeRv))
         } else {
-            if (isSmall) renderSmall(model, liveCountdown, options, appWidgetId) else renderLarge(model, liveCountdown, options, appWidgetId)
+            if (isSmall) renderSmall(model, liveCountdown, options, appWidgetId, multipleAccounts)
+            else renderLarge(model, liveCountdown, options, appWidgetId, multipleAccounts)
         }
     }
 
@@ -254,7 +262,13 @@ class WidgetRenderer(private val context: Context) {
         }
     }
 
-    private fun renderLarge(model: WidgetModel, liveCountdown: Boolean, options: Bundle?, appWidgetId: Int): RemoteViews {
+    private fun renderLarge(
+        model: WidgetModel,
+        liveCountdown: Boolean,
+        options: Bundle?,
+        appWidgetId: Int,
+        multipleAccounts: Boolean = false,
+    ): RemoteViews {
         val rv = RemoteViews(pkg, R.layout.widget_root_scroll)
         val sync = syncIntent()
         val t = palette(model.widgetTheme)
@@ -263,8 +277,13 @@ class WidgetRenderer(private val context: Context) {
         rv.setInt(R.id.sync_button, "setBackgroundResource", t.syncButton)
         rv.setOnClickPendingIntent(R.id.sync_button, sync)
         bindHeaderTownHall(rv, model.townHall, 30)
-        rv.setTextViewText(R.id.who, title(model, t))
+        rv.setTextViewText(R.id.who, title(model, t, multipleAccounts))
         rv.setTextColor(R.id.who, t.text)
+        if (multipleAccounts && appWidgetId > 0) {
+            val sw = switchAccountIntent(appWidgetId)
+            rv.setOnClickPendingIntent(R.id.who, sw)
+            rv.setOnClickPendingIntent(R.id.who_th_icon, sw)
+        }
         rv.setTextViewText(R.id.lbl_sync, lctx.getString(R.string.widget_sync))
         rv.setTextColor(R.id.lbl_sync, t.syncText)
 
@@ -295,7 +314,13 @@ class WidgetRenderer(private val context: Context) {
     fun minRowView(source: WidgetRow, model: WidgetModel, live: Boolean): RemoteViews =
         timerView(source, model, live, palette(model.widgetTheme), compact = false, tone = TONE_GREEN)
 
-    private fun renderSmall(model: WidgetModel, liveCountdown: Boolean, options: Bundle?, appWidgetId: Int): RemoteViews {
+    private fun renderSmall(
+        model: WidgetModel,
+        liveCountdown: Boolean,
+        options: Bundle?,
+        appWidgetId: Int,
+        multipleAccounts: Boolean = false,
+    ): RemoteViews {
         val rv = RemoteViews(pkg, R.layout.widget_root_small)
         val sync = syncIntent()
         val t = palette(model.widgetTheme)
@@ -304,8 +329,13 @@ class WidgetRenderer(private val context: Context) {
         rv.setInt(R.id.sync_button, "setBackgroundResource", t.syncButton)
         rv.setOnClickPendingIntent(R.id.sync_button, sync)
         bindHeaderTownHall(rv, model.townHall, 22)
-        rv.setTextViewText(R.id.who, title(model, t))
+        rv.setTextViewText(R.id.who, title(model, t, multipleAccounts))
         rv.setTextColor(R.id.who, t.text)
+        if (multipleAccounts && appWidgetId > 0) {
+            val sw = switchAccountIntent(appWidgetId)
+            rv.setOnClickPendingIntent(R.id.who, sw)
+            rv.setOnClickPendingIntent(R.id.who_th_icon, sw)
+        }
 
         if (!model.hasData) {
             rv.setViewVisibility(R.id.content, View.GONE)
@@ -772,14 +802,19 @@ class WidgetRenderer(private val context: Context) {
 
     fun themePalette(theme: String): Palette = palette(theme)
 
-    /** Player name + `· CV19` / `· TH19` in warm gold. */
-    private fun title(model: WidgetModel, t: Palette): CharSequence {
+    /** Player name + `· CV19` / `· TH19` in warm gold, plus switch glyph when >1 account exists. */
+    private fun title(model: WidgetModel, t: Palette, multipleAccounts: Boolean = false): CharSequence {
         val sb = SpannableStringBuilder(model.playerName)
         model.townHall?.let { th ->
             val start = sb.length
             val prefix = if (lctx.resources.configuration.locales[0]?.language == "pt") " · CV$th" else " · TH$th"
             sb.append(prefix)
             sb.setSpan(ForegroundColorSpan(t.gold), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        if (multipleAccounts) {
+            val start = sb.length
+            sb.append(" ⇄")
+            sb.setSpan(ForegroundColorSpan(t.sub), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         return sb
     }
@@ -817,6 +852,18 @@ class WidgetRenderer(private val context: Context) {
         val options = android.app.ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle()
         return PendingIntent.getActivity(
             context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE, options,
+        )
+    }
+
+    private fun switchAccountIntent(appWidgetId: Int): PendingIntent {
+        val intent = Intent(context, WidgetInternalReceiver::class.java)
+            .setAction(ChiefWidgetReceiver.ACTION_SWITCH_ACCOUNT)
+            .putExtra(ChiefWidgetReceiver.EXTRA_WIDGET_ID, appWidgetId)
+        return PendingIntent.getBroadcast(
+            context,
+            ("switch_acct:$appWidgetId").hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 

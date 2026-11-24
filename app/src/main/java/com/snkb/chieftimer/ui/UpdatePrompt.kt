@@ -85,14 +85,12 @@ fun UpdatePrompt() {
         },
         text = {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
-                if (info.notes.isNotBlank()) {
-                    Text(
-                        info.notes.take(800),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
+                Text(
+                    stringResource(R.string.update_ready_body, info.version),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
                 progress?.let {
                     LinearProgressIndicator(
                         progress = { it.coerceAtLeast(0f) },
@@ -141,13 +139,8 @@ fun UpdatePrompt() {
         },
         dismissButton = {
             if (!busy) {
-                Row {
-                    TextButton(onClick = { UpdatePrefs.skip(context, info.version); release = null }) {
-                        Text(stringResource(R.string.action_skip), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton(onClick = { release = null }) {
-                        Text(stringResource(R.string.gold_pass_later), color = TavernGold)
-                    }
+                TextButton(onClick = { release = null }) {
+                    Text(stringResource(R.string.gold_pass_later), color = TavernGold)
                 }
             }
         },

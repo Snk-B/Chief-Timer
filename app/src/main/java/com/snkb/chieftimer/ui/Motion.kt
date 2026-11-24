@@ -1,9 +1,15 @@
 package com.snkb.chieftimer.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -56,6 +62,30 @@ internal fun rememberReducedMotion(): Boolean {
     return reduced
 }
 
+/** True when Android Battery Saver mode is enabled; updates immediately when toggled. */
+@Composable
+internal fun rememberPowerSaveMode(): Boolean {
+    val context = LocalContext.current
+    val pm = remember(context) { context.getSystemService(PowerManager::class.java) }
+    var powerSave by remember(pm) { mutableStateOf(pm?.isPowerSaveMode == true) }
+    DisposableEffect(context, pm) {
+        if (pm == null) return@DisposableEffect onDispose {}
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) {
+                powerSave = pm.isPowerSaveMode
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+    return powerSave
+}
+
 /** Room the floating/hiding 3D bottom bar takes at the bottom of a page; 0 where the side rail is shown (wide screens). */
 internal val LocalBarInset = compositionLocalOf { 0.dp }
 
@@ -78,9 +108,10 @@ internal fun listPadding(base: Dp = 14.dp): PaddingValues = PaddingValues(
 internal fun Modifier.pageScale(pager: PagerState, page: Int, enabled: Boolean): Modifier =
     if (!enabled) this else graphicsLayer {
         val distance = abs((page - pager.currentPage) - pager.currentPageOffsetFraction).coerceIn(0f, 1f)
-        val scale = 0.96f + 0.04f * (1f - distance)
+        val scale = 0.97f + 0.03f * (1f - distance)
         scaleX = scale
         scaleY = scale
+        alpha = 0.88f + 0.12f * (1f - distance)
     }
 
 /**
@@ -114,7 +145,7 @@ internal fun SlideSwitcher(
         leaving = shown
         shown = index
         progress.snapTo(0f)
-        progress.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium))
+        progress.animateTo(1f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 560f))
         leaving = null
     }
 
@@ -185,7 +216,7 @@ internal class TavernBarScrollState(
 internal fun rememberTavernBarScrollState(pager: PagerState): TavernBarScrollState {
     val density = LocalDensity.current
     val state = remember(pager, density) {
-        with(density) { TavernBarScrollState(pager, 16.dp.toPx(), 40.dp.toPx(), 24.dp.toPx()) }
+        with(density) { TavernBarScrollState(pager, 12.dp.toPx(), 20.dp.toPx(), 24.dp.toPx()) }
     }
     LaunchedEffect(state, pager) {
         snapshotFlow { pager.isScrollInProgress }.collect { moving -> if (moving) state.show() }

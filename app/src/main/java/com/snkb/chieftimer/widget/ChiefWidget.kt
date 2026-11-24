@@ -75,9 +75,12 @@ class ChiefWidgetReceiver : AppWidgetProvider() {
         const val ACTION_FINISH = "com.snkb.chieftimer.JOB_FINISH"
         const val ACTION_TAP = "com.snkb.chieftimer.WIDGET_TAP"
         const val ACTION_DISMISS_LIVE = "com.snkb.chieftimer.DISMISS_LIVE"
+        const val ACTION_SWITCH_ACCOUNT = "com.snkb.chieftimer.SWITCH_ACCOUNT"
+        const val ACTION_SWITCH_ROAD_ACCOUNT = "com.snkb.chieftimer.SWITCH_ROAD_ACCOUNT"
         const val EXTRA_ACCOUNT_TAG = "accountTag"
         const val EXTRA_JOB_KEY = "jobKey"
         const val EXTRA_FINISH_AT = "finishAt"
+        const val EXTRA_WIDGET_ID = AppWidgetManager.EXTRA_APPWIDGET_ID
         /** Some ROMs send this instead of BOOT_COMPLETED after a fast reboot. */
         const val ACTION_QUICKBOOT = "android.intent.action.QUICKBOOT_POWERON"
     }
@@ -93,6 +96,8 @@ class WidgetInternalReceiver : BroadcastReceiver() {
             ChiefWidgetReceiver.ACTION_TICK -> WidgetReceiverDispatch.refresh(this, context, "widget")
             ChiefWidgetReceiver.ACTION_FINISH -> WidgetReceiverDispatch.refresh(this, context, "alarm")
             ChiefWidgetReceiver.ACTION_TAP -> WidgetReceiverDispatch.tap(this, context, intent)
+            ChiefWidgetReceiver.ACTION_SWITCH_ACCOUNT -> WidgetReceiverDispatch.switchAccount(this, context, intent)
+            ChiefWidgetReceiver.ACTION_SWITCH_ROAD_ACCOUNT -> WidgetReceiverDispatch.switchRoadAccount(this, context, intent)
             ChiefWidgetReceiver.ACTION_DISMISS_LIVE -> {
                 val tag = intent.getStringExtra(ChiefWidgetReceiver.EXTRA_ACCOUNT_TAG)
                 val key = intent.getStringExtra(ChiefWidgetReceiver.EXTRA_JOB_KEY)
@@ -136,6 +141,36 @@ internal object WidgetReceiverDispatch {
                 repo.log("tap", false, "Tap failed: ${t.javaClass.simpleName}: ${t.message}")
             }
             WidgetUpdater.updateAll(app, "tap")
+        }
+    }
+
+    /** Cycles one placed widget to the next synced account and redraws it immediately. */
+    fun switchAccount(receiver: BroadcastReceiver, context: Context, intent: Intent) {
+        val widgetId = intent.getIntExtra(ChiefWidgetReceiver.EXTRA_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+        runAsync(receiver) {
+            val app = context.applicationContext
+            val repo = StateRepository(app)
+            val nextTag = repo.cycleWidgetAccount(widgetId)
+            if (nextTag != null) {
+                repo.log("widget", null, "Widget #$widgetId switched to $nextTag")
+                WidgetUpdater.updateAll(app, "switch")
+            }
+        }
+    }
+
+    /** Cycles one placed Road to max widget to the next synced account and redraws it immediately. */
+    fun switchRoadAccount(receiver: BroadcastReceiver, context: Context, intent: Intent) {
+        val widgetId = intent.getIntExtra(ChiefWidgetReceiver.EXTRA_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+        runAsync(receiver) {
+            val app = context.applicationContext
+            val repo = StateRepository(app)
+            val nextTag = repo.cycleWidgetAccount(widgetId)
+            if (nextTag != null) {
+                repo.log("road_widget", null, "Road widget #$widgetId switched to $nextTag")
+                RoadWidgetUpdater.updateAll(app, force = true)
+            }
         }
     }
 
@@ -201,6 +236,9 @@ object WidgetUpdater {
             val dueLiveItems = mutableListOf<Notifier.LiveCountdownItem>()
             val ctAlert = com.snkb.chieftimer.sync.ClockTowerTracking.alertEnabled(app)
             val idleAfter = com.snkb.chieftimer.sync.IdleAlert.afterSec(app)
+            val bedtimeAlert = com.snkb.chieftimer.sync.SleepStore.alertEnabled(app)
+            val sleepWindow = if (bedtimeAlert) com.snkb.chieftimer.sync.SleepStore.get(app) else null
+            val zone = java.time.ZoneId.systemDefault()
             val liveLeadSec = if (globalSettings.notificationsEnabled) LiveUpdateAlert.leadSec(app) else null
             val lctx = com.snkb.chieftimer.locale.LanguageManager.wrap(app)
             val timesData = Times.get(app)
@@ -216,8 +254,21 @@ object WidgetUpdater {
                     playerName = acctSettings.playerName,
                 )
                 try {
-                    val r = FinishNotices.check(state, settings, names, now, ctAlert, idleAfter, noticeText)
-                    val fresh = r.notices.filter { it.jobKey !in state.notified }
+                    val helperAlert = Notifier.helperAlerts(app)
+                    val r = FinishNotices.check(
+                        state, settings, names, now, ctAlert, idleAfter, noticeText,
+                        homeAlerts = Notifier.homeAlerts(app), builderBaseAlerts = Notifier.builderBaseAlerts(app),
+                        helperAlerts = helperAlert,
+                    )
+                    val fresh = r.notices.filter { it.jobKey !in state.notified }.toMutableList()
+                    if (sleepWindow != null) {
+                        val btNotice = FinishNotices.checkBedtimeReminder(state, settings, now, sleepWindow, zone, noticeText)
+                        val sleepAt = sleepWindow.nextSleepStart(now, zone)
+                        if (btNotice != null && !com.snkb.chieftimer.sync.SleepStore.wasNotifiedForSleep(app, acct.tag, sleepAt)) {
+                            com.snkb.chieftimer.sync.SleepStore.markNotifiedForSleep(app, acct.tag, sleepAt)
+                            fresh += btNotice
+                        }
+                    }
                     repo.updateAccountState(acct.tag) { st ->
                         st.copy(notified = r.notified)
                     }
@@ -234,7 +285,10 @@ object WidgetUpdater {
                     repo.log(source, false, "Notification failed (${acct.tag}): ${t.javaClass.simpleName}: ${t.message}")
                 }
 
-                FinishNotices.alarmAt(state, settings, now, ctAlert, idleAfter)?.let { allFinishTimes.add(it) }
+                FinishNotices.alarmAt(state, settings, now, ctAlert, idleAfter, Notifier.helperAlerts(app))?.let { allFinishTimes.add(it) }
+                if (sleepWindow != null) {
+                    FinishNotices.nextBedtimeCheckAt(now, sleepWindow, zone)?.let { allFinishTimes.add(it) }
+                }
 
                 if (liveLeadSec != null && state.export != null) {
                     val acctModel = WidgetModelBuilder.build(
@@ -286,12 +340,13 @@ object WidgetUpdater {
             val forceRoad = source in setOf("config", "theme", "language", "app", "settings", "icons")
             runCatching { WidgetPreviews.update(app, globalSettings.effectiveWidgetTheme, force = forceRoad) }
             val roadCount = RoadWidgetUpdater.updateAll(app, force = forceRoad)
+            val overviewCount = runCatching { OverviewWidgetUpdater.updateAll(app) }.getOrDefault(0)
 
             val manager = AppWidgetManager.getInstance(app)
             val ids = widgetIds(app)
             if (ids.isEmpty()) {
                 WidgetAlarm.cancelRedraw(app)
-                return roadCount
+                return roadCount + overviewCount
             }
 
             val renderer = WidgetRenderer(app)
@@ -313,21 +368,22 @@ object WidgetUpdater {
                 val theme = repo.getWidgetTheme(id)
                 val model = WidgetModelBuilder.build(state, settings, names, Times.get(app), now, tag ?: "", theme, widgetText, GoldPassStore.reduction(app, tag))
                 val style = repo.getWidgetStyle(id)
+                val multi = accounts.size > 1
                 try {
-                    manager.updateAppWidget(id, renderer.render(model, settings.liveCountdown, manager.getAppWidgetOptions(id), style, id))
+                    manager.updateAppWidget(id, renderer.render(model, settings.liveCountdown, manager.getAppWidgetOptions(id), style, id, multi))
                 } catch (e: RuntimeException) {
                     // Rows embedded in the widget (Android 17) were too big to send: use the list service instead.
                     if (!renderer.embedItems) throw e
                     renderer.embedItems = false
                     repo.log(source, false, "Embedded widget rows failed (${e.javaClass.simpleName}); using the list service")
-                    manager.updateAppWidget(id, renderer.render(model, settings.liveCountdown, manager.getAppWidgetOptions(id), style, id))
+                    manager.updateAppWidget(id, renderer.render(model, settings.liveCountdown, manager.getAppWidgetOptions(id), style, id, multi))
                 }
                 manager.notifyAppWidgetViewDataChanged(id, com.snkb.chieftimer.R.id.list)
 
                 WidgetSchedule.nextUpdateMs(model, nowMs, settings.liveCountdown)?.let { nextUpdates.add(it) }
             }
             WidgetAlarm.scheduleRedraw(app, nextUpdates.minOrNull())
-            ids.size + roadCount
+            ids.size + roadCount + overviewCount
         } catch (t: Throwable) {
             repo.log(source, false, "Widget refresh failed: ${t.javaClass.simpleName}: ${t.message}")
             -1

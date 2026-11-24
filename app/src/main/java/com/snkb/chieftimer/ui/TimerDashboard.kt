@@ -42,6 +42,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,7 +92,7 @@ fun TimerDashboard(
     eventSettings: EventSettings,
     accounts: List<AccountMeta>,
     selectedTag: String?,
-    now: Long,
+    nowState: State<Long>,
     busy: Boolean,
     onSync: () -> Unit,
     onUpdateBoosts: ((ActiveBoostState) -> ActiveBoostState) -> Unit,
@@ -101,11 +103,19 @@ fun TimerDashboard(
     modifier: Modifier = Modifier,
     wide: Boolean = false,
     export: VillageExport? = null,
+    appState: com.snkb.chieftimer.core.AppState = com.snkb.chieftimer.core.AppState(),
 ) {
     var filter by rememberSaveable { mutableStateOf(TimerFilter.ALL) }
     var calendar by rememberSaveable { mutableStateOf(false) }
     var showHelp by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val maxData = remember(com.snkb.chieftimer.data.MaxDataStore.version) {
+        com.snkb.chieftimer.data.MaxDataStore.get(context)
+    }
+    val minuteNow by remember(nowState) { derivedStateOf { (nowState.value / 60L) * 60L } }
     val timers = remember(model, filter) { model.timers(filter) }
+    val cwlConflicts = rememberCwlConflicts(export, appState, minuteNow)
+    val cwlConflictByKey = remember(cwlConflicts) { cwlConflicts.associateBy { it.jobKey } }
     val gridState = rememberLazyGridState()
 
     LazyVerticalGrid(
@@ -120,7 +130,9 @@ fun TimerDashboard(
             item(key = "village_command_banner", span = { GridItemSpan(maxLineSpan) }) {
                 TavernVillageCommandBanner(
                     model = model,
+                    nowState = nowState,
                     lastSync = lastSync,
+                    lastDiff = appState.lastDiff,
                     busy = busy,
                     onSync = onSync,
                 )
@@ -137,12 +149,28 @@ fun TimerDashboard(
         }
 
         item(key = "gold_pass_banner", span = { GridItemSpan(maxLineSpan) }) {
-            GoldPassBanner(selectedTag, now)
+            GoldPassBanner(selectedTag, minuteNow / 3600L * 3600L)
         }
 
         if (model.hasData) {
             item(key = "stat_shields", span = { GridItemSpan(maxLineSpan) }) {
-                TavernStatShieldsRow(model)
+                TavernStatShieldsRow(model, nowState)
+            }
+
+            if (export != null && export.helpers.any { it.level > 0 }) {
+                item(key = "helper_cooldowns", span = { GridItemSpan(maxLineSpan) }) {
+                    HelperCooldownRow(export, nowState.value)
+                }
+            }
+
+            item(key = "timer_strategy", span = { GridItemSpan(maxLineSpan) }) {
+                TimerStrategyCard(
+                    model = model,
+                    export = export,
+                    appState = appState,
+                    now = minuteNow,
+                    cwlConflicts = cwlConflicts,
+                )
             }
 
             item(key = "upgrades_header", span = { GridItemSpan(maxLineSpan) }) {
@@ -156,7 +184,7 @@ fun TimerDashboard(
 
             if (calendar) {
                 item(key = "calendar_timeline", span = { GridItemSpan(maxLineSpan) }) {
-                    TimerCalendar(model = model, export = export, now = now, filter = filter)
+                    TimerCalendar(model = model, export = export, now = minuteNow, filter = filter)
                 }
             } else {
                 if (timers.isEmpty()) {
@@ -173,7 +201,7 @@ fun TimerDashboard(
                 }
 
                 items(timers, key = { it.row.jobKey ?: "${it.category}_${it.row.name}" }) { timer ->
-                    TavernTimerCard(timer)
+                    TavernTimerCard(timer, nowState, model.townHall, maxData, timer.row.jobKey?.let { cwlConflictByKey[it] })
                 }
             }
         }
@@ -182,10 +210,23 @@ fun TimerDashboard(
     if (showHelp) HelpDialog(onDismiss = { showHelp = false })
 }
 
+private fun com.snkb.chieftimer.core.WidgetRow.liveRemaining(now: Long): Long =
+    if (kind == RowKind.RUNNING && finishAt != null) (finishAt - now).coerceAtLeast(0L) else remaining
+
+private fun com.snkb.chieftimer.core.WidgetRow.liveProgress(liveRem: Long): Float {
+    if (kind != RowKind.RUNNING || finishAt == null) return progress
+    if (remaining <= 0L || progress >= 0.999f) return progress
+    val estTotal = remaining.toFloat() / (1f - progress)
+    if (estTotal <= 1f) return progress
+    return (1f - (liveRem.toFloat() / estTotal)).coerceIn(progress, 0.999f)
+}
+
 @Composable
 private fun TavernVillageCommandBanner(
     model: WidgetModel,
+    nowState: State<Long>,
     lastSync: SyncLogEntry?,
+    lastDiff: com.snkb.chieftimer.core.SyncDiff?,
     busy: Boolean,
     onSync: () -> Unit,
 ) {
@@ -197,8 +238,9 @@ private fun TavernVillageCommandBanner(
     val thBitmap = rememberTownHallIcon(model.townHall, 80.dp, minPx = 256)
 
     val dayUnit = stringResource(R.string.time_day_short)
-    val builderTotal = model.builderRows.filter { it.kind == RowKind.RUNNING }.sumOf { it.remaining }
-    val labTotal = (listOf(model.labRow) + model.extraLabRows).filter { it.kind == RowKind.RUNNING }.sumOf { it.remaining }
+    val now = nowState.value
+    val builderTotal = model.builderRows.filter { it.kind == RowKind.RUNNING }.sumOf { it.liveRemaining(now) }
+    val labTotal = (listOf(model.labRow) + model.extraLabRows).filter { it.kind == RowKind.RUNNING }.sumOf { it.liveRemaining(now) }
 
     TavernWoodBanner {
         // Top Row: 3D Town Hall Icon + Village Title & Total Work Left
@@ -247,6 +289,23 @@ private fun TavernVillageCommandBanner(
                         maxLines = 2,
                     )
                 }
+                if (lastDiff != null && lastDiff.hasChanges) {
+                    val parts = listOfNotNull(
+                        lastDiff.started.takeIf { it > 0 }?.let { stringResource(R.string.diff_started, it) },
+                        lastDiff.finished.takeIf { it > 0 }?.let { stringResource(R.string.diff_finished, it) },
+                        lastDiff.levelsGained.takeIf { it > 0 }?.let { stringResource(R.string.diff_levels, it) },
+                        lastDiff.wallsUpgraded.takeIf { it > 0 }?.let { stringResource(R.string.diff_walls, it) },
+                    ).joinToString(" · ")
+                    if (parts.isNotEmpty()) {
+                        Text(
+                            text = parts,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = TavernGreenLight,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
 
@@ -270,7 +329,7 @@ private fun TavernVillageCommandBanner(
                     text = stringResource(
                         R.string.next_finish,
                         next.row.name,
-                        Countdown.text(next.row.remaining, dayUnit),
+                        Countdown.text(next.row.liveRemaining(now), dayUnit),
                     ),
                     fontSize = 13.sp,
                     color = pal.ribbonText,
@@ -472,19 +531,20 @@ private fun TavernWelcomeBanner(
 }
 
 @Composable
-private fun TavernStatShieldsRow(model: WidgetModel) {
+private fun TavernStatShieldsRow(model: WidgetModel, nowState: State<Long>) {
+    val now = nowState.value
     val dayUnit = stringResource(R.string.time_day_short)
     val nextFree = if (model.buildersBusy < model.buildersTotal) {
         stringResource(R.string.stat_free_now)
     } else {
-        model.builderRows.filter { it.kind == RowKind.RUNNING && !it.goblin }.minOfOrNull { it.remaining }
+        model.builderRows.filter { it.kind == RowKind.RUNNING && !it.goblin }.minOfOrNull { it.liveRemaining(now) }
             ?.let { Countdown.text(it, dayUnit) } ?: "—"
     }
     val labRunning = (listOf(model.labRow) + model.extraLabRows).filter { it.kind == RowKind.RUNNING }
     val nextLab = if (labRunning.isEmpty()) {
         stringResource(R.string.stat_free_now)
     } else {
-        Countdown.text(labRunning.minOf { it.remaining }, dayUnit)
+        Countdown.text(labRunning.minOf { it.liveRemaining(now) }, dayUnit)
     }
 
     Row(
@@ -513,12 +573,28 @@ private fun TavernStatShieldsRow(model: WidgetModel) {
 }
 
 @Composable
-private fun TavernTimerCard(timer: DashboardTimer) {
+private fun TavernTimerCard(
+    timer: DashboardTimer,
+    nowState: State<Long>,
+    townHall: Int?,
+    maxData: com.snkb.chieftimer.core.MaxData,
+    cwlConflict: com.snkb.chieftimer.core.CwlConflict? = null,
+) {
     val pal = LocalChiefPalette.current
     val row = timer.row
 
     val icon = rememberFirstGameIcon(row.iconIds, row.iconLevel, 52.dp)
     val goblinBmp = rememberNamedGameIcon("goblin", 18.dp, enabled = row.goblin)
+    // Highest level this item can reach at the current Town Hall (home village items only).
+    val maxLevel = remember(row.iconIds, row.iconLevel, townHall, maxData) {
+        val level = row.iconLevel
+        val th = townHall
+        if (level == null || th == null || timer.category == TimerFilter.BUILDER_BASE) null
+        else row.iconIds.firstNotNullOfOrNull { maxData.items[it] }
+            ?.let { item -> item.steps.indexOfLast { it.townHall <= th } + 1 }
+            ?.takeIf { it > 0 }
+    }
+    val finishDateText = remember(row.finishAt) { row.finishAt?.let { formatTimestamp(it) } }
 
     val categoryLabel = when (timer.category) {
         TimerFilter.BUILDER_BASE -> stringResource(R.string.filter_bb)
@@ -579,7 +655,7 @@ private fun TavernTimerCard(timer: DashboardTimer) {
                     }
                 }
 
-                // Upgrade Name -> Level (left) + Bold Countdown (right)
+                // Upgrade Name -> Level (left) + Bold Countdown (right, isolated 1s leaf)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -593,55 +669,32 @@ private fun TavernTimerCard(timer: DashboardTimer) {
                         maxLines = 1,
                         modifier = Modifier.weight(1f).padding(end = 6.dp),
                     )
-                    ClashOutlinedText(
-                        text = if (row.kind == RowKind.RUNNING) {
-                            Countdown.text(row.remaining, stringResource(R.string.time_day_short))
-                        } else {
-                            row.staticStatus
-                        },
-                        fontSize = 17.sp,
-                        color = Color.White,
-                        strokeWidth = 5f,
+                    LiveCardCountdownText(row, nowState)
+                }
+
+                if (maxLevel != null && row.iconLevel != null) {
+                    Text(
+                        text = stringResource(
+                            if (row.iconLevel >= maxLevel) R.string.timer_reaches_max else R.string.timer_max_level,
+                            row.iconLevel,
+                            maxLevel,
+                            townHall ?: 0,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        tabularNums = true,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
 
-                // Glossy Recessed Wavy Tube Bar
+                // Glossy Recessed Wavy Tube Bar + % complete (isolated 1s leaf)
                 if (row.kind != RowKind.IDLE) {
-                    TavernWavyTubeBar(
-                        progress = row.progress,
-                        tone = barTone,
+                    LiveCardProgressBlock(
+                        row = row,
+                        nowState = nowState,
+                        barTone = barTone,
+                        finishDateText = finishDateText,
                     )
-
-                    // Bottom row: Percent complete (left) + Finish timestamp pill (right)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.percent_complete, (row.progress.coerceIn(0f, 1f) * 100).toInt()),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        if (row.kind == RowKind.RUNNING && row.finishAt != null) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(pal.barTrackBg)
-                                    .border(1.dp, pal.barTrackRim, RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 9.dp, vertical = 3.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.finishes_at, formatTimestamp(row.finishAt)),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
                 }
 
                 if (row.kind != RowKind.RUNNING) {
@@ -654,33 +707,121 @@ private fun TavernTimerCard(timer: DashboardTimer) {
             }
         }
 
-        // Assigned Helper Badge (Apprentice / Lab Assistant) aligned cleanly at bottom-end like Concept 2
+        // Assigned Helper Badge + CWL Overlap Warning aligned cleanly at bottom-end
         if (row.kind == RowKind.RUNNING) {
             val helper = when (row.button) {
                 RowButton.APPRENTICE -> stringResource(R.string.apprentice_assigned)
                 RowButton.LAB_ASSISTANT -> stringResource(R.string.assistant_assigned)
                 else -> null
             }
-            if (helper != null) {
+            if (helper != null || cwlConflict != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
                 ) {
-                    val badgeShape = RoundedCornerShape(9.dp)
-                    Box(
-                        modifier = Modifier
-                            .clip(badgeShape)
-                            .background(Brush.horizontalGradient(listOf(pal.ribbonEdge, pal.ribbonCenter)))
-                            .border(1.dp, TavernGold.copy(alpha = 0.72f), badgeShape)
-                            .padding(horizontal = 10.dp, vertical = 3.dp),
-                    ) {
-                        Text(
-                            text = helper,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = TavernGoldLight,
-                        )
+                    if (cwlConflict != null) {
+                        val badgeShape = RoundedCornerShape(9.dp)
+                        val dayUnit = stringResource(R.string.time_day_short)
+                        val msg = if (cwlConflict.cwlActiveNow) {
+                            stringResource(R.string.cwl_badge_active, Countdown.text(cwlConflict.overlapSec, dayUnit))
+                        } else {
+                            stringResource(R.string.cwl_badge_overlap, Countdown.text(cwlConflict.overlapSec, dayUnit))
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(badgeShape)
+                                .background(Color(0x55C87D12))
+                                .border(1.dp, TavernGold, badgeShape)
+                                .padding(horizontal = 9.dp, vertical = 3.dp),
+                        ) {
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = TavernGoldLight,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    if (helper != null) {
+                        val badgeShape = RoundedCornerShape(9.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(badgeShape)
+                                .background(Brush.horizontalGradient(listOf(pal.ribbonEdge, pal.ribbonCenter)))
+                                .border(1.dp, TavernGold.copy(alpha = 0.72f), badgeShape)
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                        ) {
+                            Text(
+                                text = helper,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = TavernGoldLight,
+                            )
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveCardCountdownText(row: com.snkb.chieftimer.core.WidgetRow, nowState: State<Long>) {
+    val text = if (row.kind == RowKind.RUNNING) {
+        Countdown.text(row.liveRemaining(nowState.value), stringResource(R.string.time_day_short))
+    } else {
+        row.staticStatus
+    }
+    ClashOutlinedText(
+        text = text,
+        fontSize = 17.sp,
+        color = Color.White,
+        strokeWidth = 5f,
+        maxLines = 1,
+        tabularNums = true,
+    )
+}
+
+@Composable
+private fun LiveCardProgressBlock(
+    row: com.snkb.chieftimer.core.WidgetRow,
+    nowState: State<Long>,
+    barTone: TavernBarTone,
+    finishDateText: String?,
+) {
+    val pal = LocalChiefPalette.current
+    val liveProgress = if (row.kind == RowKind.RUNNING) {
+        row.liveProgress(row.liveRemaining(nowState.value))
+    } else {
+        row.progress
+    }
+    TavernWavyTubeBar(
+        progress = liveProgress,
+        tone = barTone,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = stringResource(R.string.percent_complete, (liveProgress.coerceIn(0f, 1f) * 100).toInt()),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (row.kind == RowKind.RUNNING && row.finishAt != null) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(pal.barTrackBg)
+                    .border(1.dp, pal.barTrackRim, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 9.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.finishes_at, finishDateText ?: ""),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
             }
         }
     }

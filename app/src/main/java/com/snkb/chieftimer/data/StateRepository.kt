@@ -128,6 +128,7 @@ class StateRepository(context: Context) {
                 appTheme = global.appTheme,
                 widgetFollowsAppTheme = global.widgetFollowsAppTheme,
                 floatingTabBar = global.floatingTabBar,
+                ecoAnimations = global.ecoAnimations,
             )
         }
     }.distinctUntilChanged()
@@ -157,6 +158,7 @@ class StateRepository(context: Context) {
             appTheme = global.appTheme,
             widgetFollowsAppTheme = global.widgetFollowsAppTheme,
             floatingTabBar = global.floatingTabBar,
+            ecoAnimations = global.ecoAnimations,
         )
     }
 
@@ -317,6 +319,83 @@ class StateRepository(context: Context) {
         }
     }
 
+    /** Advances [appWidgetId] to the next saved account in [AccountsIndex] and returns its normalized tag, or null if < 2 accounts. */
+    suspend fun cycleWidgetAccount(appWidgetId: Int): String? {
+        var nextTag: String? = null
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+            if (index.accounts.size < 2) return@edit
+            val mapJson = prefs[WIDGET_MAPPING]
+            val map = (mapJson?.let { runCatching { AppState.JSON.decodeFromString<Map<String, String>>(it) }.getOrNull() } ?: emptyMap()).toMutableMap()
+            val currentTag = map[appWidgetId.toString()] ?: index.selectedTag ?: index.accounts.first().tag
+            val curIdx = index.accounts.indexOfFirst { it.tag == currentTag }.coerceAtLeast(0)
+            val next = index.accounts[(curIdx + 1) % index.accounts.size].tag
+            map[appWidgetId.toString()] = next
+            prefs[WIDGET_MAPPING] = AppState.JSON.encodeToString(map)
+            nextTag = next
+        }
+        return nextTag
+    }
+
+    suspend fun getVillageHistory(tag: String): com.snkb.chieftimer.core.VillageHistory {
+        val norm = normalizeTag(tag)
+        val prefs = readPrefs()
+        return com.snkb.chieftimer.core.VillageHistory.decode(prefs[historyKey(norm)])
+    }
+
+    suspend fun appendVillageSnapshot(tag: String, snapshot: com.snkb.chieftimer.core.VillageSnapshot) {
+        val norm = normalizeTag(tag)
+        store.edit { prefs ->
+            val current = com.snkb.chieftimer.core.VillageHistory.decode(prefs[historyKey(norm)])
+            prefs[historyKey(norm)] = current.add(snapshot).encode()
+        }
+    }
+
+    /** Captures all saved accounts, settings, histories, and global preferences into a portable backup bundle. */
+    suspend fun exportBackup(): BackupBundle {
+        val prefs = readPrefs()
+        val index = AccountsIndex.decode(prefs[ACCOUNTS_INDEX])
+        val global = GlobalSettings.decode(prefs[GLOBAL_SETTINGS])
+        val list = index.accounts.map { meta ->
+            val norm = normalizeTag(meta.tag)
+            BackupAccount(
+                meta = meta.copy(tag = norm),
+                state = AppState.decode(prefs[stateKey(norm)]),
+                settings = AccountSettings.decode(prefs[settingsKey(norm)]),
+                history = com.snkb.chieftimer.core.VillageHistory.decode(prefs[historyKey(norm)]),
+            )
+        }
+        return BackupBundle(
+            createdAt = System.currentTimeMillis() / 1000L,
+            selectedTag = index.selectedTag,
+            globalSettings = global,
+            accounts = list,
+        )
+    }
+
+    /** Restores accounts, settings, and histories from [bundle] and returns how many accounts were imported. */
+    suspend fun importBackup(bundle: BackupBundle): Int {
+        if (bundle.accounts.isEmpty()) return 0
+        store.edit { prefs ->
+            ensureMigrated(prefs)
+            prefs[GLOBAL_SETTINGS] = bundle.globalSettings.encode()
+            val metas = mutableListOf<AccountMeta>()
+            for (acct in bundle.accounts) {
+                val norm = normalizeTag(acct.meta.tag)
+                val th = acct.meta.townHall ?: acct.state.export?.townHallLevel
+                metas += acct.meta.copy(tag = norm, townHall = th)
+                prefs[stateKey(norm)] = acct.state.encode()
+                prefs[settingsKey(norm)] = acct.settings.encode()
+                prefs[historyKey(norm)] = acct.history.encode()
+            }
+            val selected = bundle.selectedTag?.let(::normalizeTag)?.takeIf { tag -> metas.any { it.tag == tag } }
+                ?: metas.firstOrNull()?.tag
+            prefs[ACCOUNTS_INDEX] = AccountsIndex(accounts = metas, selectedTag = selected).encode()
+        }
+        return bundle.accounts.size
+    }
+
     /** Look of one placed widget: [WIDGET_STYLE_LIST] (default) or [WIDGET_STYLE_TILES]. */
     suspend fun getWidgetStyle(appWidgetId: Int): String {
         val json = store.data.first()[WIDGET_STYLES] ?: return WIDGET_STYLE_LIST
@@ -437,6 +516,7 @@ class StateRepository(context: Context) {
                 appTheme = global.appTheme,
                 widgetFollowsAppTheme = global.widgetFollowsAppTheme,
                 floatingTabBar = global.floatingTabBar,
+                ecoAnimations = global.ecoAnimations,
             )
             val next = transform(currentAppSet)
 
@@ -452,6 +532,7 @@ class StateRepository(context: Context) {
                 appTheme = next.appTheme,
                 widgetFollowsAppTheme = next.widgetFollowsAppTheme,
                 floatingTabBar = next.floatingTabBar,
+                ecoAnimations = next.ecoAnimations,
             ).encode()
 
             val updatedAcct = AccountSettings(
@@ -492,6 +573,7 @@ class StateRepository(context: Context) {
 
         fun stateKey(tag: String) = stringPreferencesKey("state_json_$tag")
         fun settingsKey(tag: String) = stringPreferencesKey("settings_json_$tag")
+        fun historyKey(tag: String) = stringPreferencesKey("history_json_$tag")
     }
 }
 

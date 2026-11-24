@@ -101,6 +101,10 @@ data class NoticeText(
     val builderStillFreeText: String = "A builder has been free for %1\$d h. Start an upgrade.",
     val clockTowerTitle: String = FinishNotices.CLOCK_TOWER_TITLE,
     val clockTowerText: String = FinishNotices.CLOCK_TOWER_TEXT,
+    val helperReadyTitle: String = FinishNotices.HELPER_READY_TITLE,
+    val helperReadyText: String = FinishNotices.HELPER_READY_TEXT,
+    val bedtimeTitle: String = FinishNotices.BEDTIME_TITLE,
+    val bedtimeText: String = FinishNotices.BEDTIME_TEXT,
 ) {
     companion object {
         val EN = NoticeText()
@@ -125,6 +129,9 @@ object FinishNotices {
         clockTowerAlert: Boolean = false,
         idleAfterSec: Long? = null,
         text: NoticeText = NoticeText.EN,
+        homeAlerts: Boolean = true,
+        builderBaseAlerts: Boolean = true,
+        helperAlerts: Boolean = false,
     ): Result {
         val export = state.export ?: return Result(emptyList(), emptySet())
         val engine = TimerEngine(settings.boosts)
@@ -133,24 +140,37 @@ object FinishNotices {
             .filter { (_, at) -> Finish.isDone(at, now) }
         val notices = finished
             .filter { (job, at) -> job.key !in state.notified && at > now - MAX_AGE_SEC }
+            // A village whose alerts are off is still marked as announced below, so turning it on later does not replay old finishes.
+            .filter { (job, _) -> if (isBuilderBase(job)) builderBaseAlerts else homeAlerts }
             .sortedBy { it.second }
             .map { (job, _) -> notice(job, names, text) }
         val ctEnd = if (clockTowerAlert) clockTowerEnd(export) else null
         val ctDone = ctEnd != null && Finish.isDone(ctEnd, now)
         val ctKey = ctEnd?.let { "$CLOCK_TOWER_KEY$it" }
-        val ctNotice = if (ctDone && ctKey !in state.notified && ctEnd!! > now - MAX_AGE_SEC)
+        val ctNotice = if (builderBaseAlerts && ctDone && ctKey !in state.notified && ctEnd!! > now - MAX_AGE_SEC)
             listOf(FinishNotice(ctKey!!, text.clockTowerTitle, text.clockTowerText)) else emptyList()
+        // Helper cooldown notice (Apprentice / Lab Assistant / Alchemist share the export's daily cooldown cycle).
+        val helperEnd = if (helperAlerts) helperCooldownEnd(export) else null
+        val helperDone = helperEnd != null && Finish.isDone(helperEnd, now)
+        val helperKey = helperEnd?.let { "$HELPER_READY_KEY$it" }
+        val helperNotice = if (homeAlerts && helperDone && helperKey !in state.notified && helperEnd!! > now - MAX_AGE_SEC)
+            listOf(FinishNotice(helperKey!!, text.helperReadyTitle, text.helperReadyText)) else emptyList()
         // "Still free" reminders: a builder or lab job finished [idleAfterSec] ago and the next sync hasn't replaced it.
         val idleDue = if (idleAfterSec == null) emptyList() else finished
             .filter { (job, _) -> (job.category == JobCategory.BUILDER || job.category == JobCategory.LAB) && !job.isGoblin }
             .filter { (_, at) -> Finish.isDone(at + idleAfterSec, now) }
-        val idleNotices = idleDue
+        val idleNotices = if (!homeAlerts) emptyList() else idleDue
             .filter { (job, at) -> IDLE_KEY + job.key !in state.notified && at + idleAfterSec!! > now - MAX_AGE_SEC }
             .sortedBy { it.second }
             .map { (job, _) -> idleNotice(job, idleAfterSec!!, text) }
-        val keys = finished.map { it.first.key }.toSet() + listOfNotNull(ctKey.takeIf { ctDone }) + idleDue.map { IDLE_KEY + it.first.key }
-        return Result(notices + idleNotices + ctNotice, keys)
+        val keys = finished.map { it.first.key }.toSet() +
+            listOfNotNull(ctKey.takeIf { ctDone }, helperKey.takeIf { helperDone }) +
+            idleDue.map { IDLE_KEY + it.first.key }
+        return Result(notices + idleNotices + ctNotice + helperNotice, keys)
     }
+
+    /** Builder Base (night village) builders and the Star Laboratory; everything else is the home village. */
+    fun isBuilderBase(job: Job) = job.category == JobCategory.BB_BUILDER || job.category == JobCategory.STAR_LAB
 
     const val IDLE_KEY = "idle:"
 
@@ -167,21 +187,88 @@ object FinishNotices {
     const val CLOCK_TOWER_KEY = "clocktower:"
     const val CLOCK_TOWER_TITLE = "Clock Tower ready"
     const val CLOCK_TOWER_TEXT = "Its cooldown is over, you can boost the Builder Base again."
+    const val HELPER_READY_KEY = "helper:"
+    const val HELPER_READY_TITLE = "Helpers ready"
+    const val HELPER_READY_TEXT = "Your Apprentice Builder, Lab Assistant or Alchemist is ready to assign."
+    const val BEDTIME_KEY = "bedtime:"
+    const val BEDTIME_TITLE = "Bedtime upgrade check"
+    const val BEDTIME_TEXT = "You have a free builder or lab before sleep — open Plan > Bedtime to pick an upgrade."
+    private const val BEDTIME_LEAD_SEC = 45 * 60L
+
+    /**
+     * Optional pre-sleep check: when [now] is within 45 minutes of [window]'s bedtime and a regular
+     * builder or the lab is free (or finishes before sleep), returns a notice to queue an overnight upgrade.
+     */
+    fun checkBedtimeReminder(
+        state: AppState,
+        settings: AppSettings,
+        now: Long,
+        window: SleepWindow,
+        zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+        text: NoticeText = NoticeText.EN,
+    ): FinishNotice? {
+        val export = state.export ?: return null
+        if (window.startMin == window.endMin || window.asleep(now, zone)) return null
+        val sleepAt = window.nextSleepStart(now, zone)
+        if (sleepAt - now !in 1L..BEDTIME_LEAD_SEC) return null
+        val key = "$BEDTIME_KEY$sleepAt"
+        if (key in state.notified) return null
+
+        val engine = TimerEngine(settings.boosts)
+        val totalBuilders = settings.totalBuilders(export)
+        val busyBuildersUntilSleep = export.regularBuilderJobs.count {
+            engine.finishTime(it, export, state.links, state.boosts) > sleepAt
+        }
+        val freeBuilderBeforeSleep = busyBuildersUntilSleep < totalBuilders
+        val labFreeBeforeSleep = export.labJobs.none {
+            engine.finishTime(it, export, state.links, state.boosts) > sleepAt
+        }
+        if (!freeBuilderBeforeSleep && !labFreeBeforeSleep) return null
+        return FinishNotice(key, text.bedtimeTitle, text.bedtimeText)
+    }
+
+    /** Next wakeup timestamp for the pre-sleep check (45 min before [SleepWindow.startMin]). */
+    fun nextBedtimeCheckAt(
+        now: Long,
+        window: SleepWindow,
+        zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    ): Long? {
+        if (window.startMin == window.endMin) return null
+        var sleepAt = window.nextSleepStart(now, zone)
+        var triggerAt = sleepAt - BEDTIME_LEAD_SEC
+        if (triggerAt <= now) {
+            sleepAt = window.nextSleepStart(sleepAt + 60L, zone)
+            triggerAt = sleepAt - BEDTIME_LEAD_SEC
+        }
+        return triggerAt
+    }
 
     /** Epoch s when the exported Clock Tower cooldown ends; null if there is none. */
     fun clockTowerEnd(export: VillageExport): Long? =
         export.clockTowerCooldownRemaining?.takeIf { it > 0 }?.let { export.timestamp + it }
 
+    /** Earliest active helper cooldown end time > 0 from [VillageExport.helpers]. */
+    fun helperCooldownEnd(export: VillageExport): Long? =
+        export.helpers.filter { it.level > 0 && it.cooldown > 0 }.minOfOrNull { export.timestamp + it.cooldown }
+
     /** Next finish time (epoch s) of a job that isn't [Finish.isDone] at [now]. */
-    fun nextFinish(state: AppState, settings: AppSettings, now: Long, clockTowerAlert: Boolean = false, idleAfterSec: Long? = null): Long? {
+    fun nextFinish(
+        state: AppState,
+        settings: AppSettings,
+        now: Long,
+        clockTowerAlert: Boolean = false,
+        idleAfterSec: Long? = null,
+        helperAlerts: Boolean = false,
+    ): Long? {
         val export = state.export ?: return null
         val engine = TimerEngine(settings.boosts)
         val ct = if (clockTowerAlert) clockTowerEnd(export) else null
+        val helper = if (helperAlerts) helperCooldownEnd(export) else null
         val finishes = export.jobs.map { it to engine.finishTime(it, export, state.links, state.boosts) }
         val idle = if (idleAfterSec == null) emptyList() else finishes
             .filter { (job, _) -> (job.category == JobCategory.BUILDER || job.category == JobCategory.LAB) && !job.isGoblin }
             .map { it.second + idleAfterSec }
-        return (finishes.map { it.second } + idle + listOfNotNull(ct))
+        return (finishes.map { it.second } + idle + listOfNotNull(ct, helper))
             .filter { !Finish.isDone(it, now) }.minOrNull()
     }
 
@@ -189,8 +276,15 @@ object FinishNotices {
      * Epoch s for the wakeup finish alarm: [Finish.GRACE_SEC] after the next finish, so the redraw it
      * triggers is certain to see the job as done.
      */
-    fun alarmAt(state: AppState, settings: AppSettings, now: Long, clockTowerAlert: Boolean = false, idleAfterSec: Long? = null): Long? =
-        nextFinish(state, settings, now, clockTowerAlert, idleAfterSec)?.plus(Finish.GRACE_SEC)
+    fun alarmAt(
+        state: AppState,
+        settings: AppSettings,
+        now: Long,
+        clockTowerAlert: Boolean = false,
+        idleAfterSec: Long? = null,
+        helperAlerts: Boolean = false,
+    ): Long? =
+        nextFinish(state, settings, now, clockTowerAlert, idleAfterSec, helperAlerts)?.plus(Finish.GRACE_SEC)
 
     fun notice(job: Job, names: NameMap, text: NoticeText = NoticeText.EN): FinishNotice {
         val title = names.title(job)

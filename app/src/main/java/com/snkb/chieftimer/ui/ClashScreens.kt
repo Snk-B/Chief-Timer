@@ -43,6 +43,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** The picture for an event card. Events that came from the downloaded list (not one of ours) get the trophy medal. */
+internal fun eventIcon(id: String): Int = when (id) {
+    GameEvents.CLAN_GAMES -> R.drawable.ev_clan_games
+    GameEvents.RAID_WEEKEND -> R.drawable.ev_raid
+    GameEvents.CWL_SIGNUP -> R.drawable.ev_cwl_signup
+    GameEvents.CWL_WARS -> R.drawable.ev_cwl_wars
+    GameEvents.LEAGUE_RESET -> R.drawable.ev_league
+    else -> R.drawable.ev_season
+}
+
 /** Clash > Events styled in Taverna Clash / Taverna Escura (AMOLED): live local-time countdowns + ClashKing dates. */
 @Composable
 internal fun EventsPage(now: Long) {
@@ -75,30 +85,45 @@ internal fun EventsPage(now: Long) {
             val name = e.name ?: stringResource(eventName(e.id))
             val left = Bedtime.durationLabel((e.target - now).coerceAtLeast(0), dayUnit)
             TavernStoneCard(highlighted = e.active) {
-                ClashOutlinedText(
-                    text = name,
-                    fontSize = 15.5.sp,
-                    color = if (e.active) TavernGoldLight else Color.White,
-                    strokeWidth = 4.2f,
-                    maxLines = 2,
-                )
-                ClashOutlinedText(
-                    text = when {
-                        e.point -> stringResource(R.string.clash_ev_in, left)
-                        e.active -> stringResource(R.string.clash_ev_ends_in, left)
-                        else -> stringResource(R.string.clash_ev_starts_in, left)
-                    },
-                    fontSize = 21.sp,
-                    color = if (e.active) TavernGreenLight else TavernGold,
-                    strokeWidth = 5f,
-                    tabularNums = true,
-                    maxLines = 1,
-                )
-                Text(
-                    if (e.point) local(e.endsAt) else stringResource(R.string.clash_ev_range, local(e.startsAt), local(e.endsAt)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    TavernIconFrame(size = 58.dp) {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(eventIcon(e.id)),
+                            contentDescription = null,
+                            modifier = Modifier.padding(4.dp).fillMaxSize(),
+                        )
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ClashOutlinedText(
+                            text = name,
+                            fontSize = 15.5.sp,
+                            color = if (e.active) TavernGoldLight else Color.White,
+                            strokeWidth = 4.2f,
+                            maxLines = 2,
+                        )
+                        ClashOutlinedText(
+                            text = when {
+                                e.point -> stringResource(R.string.clash_ev_in, left)
+                                e.active -> stringResource(R.string.clash_ev_ends_in, left)
+                                else -> stringResource(R.string.clash_ev_starts_in, left)
+                            },
+                            fontSize = 21.sp,
+                            color = if (e.active) TavernGreenLight else TavernGold,
+                            strokeWidth = 5f,
+                            tabularNums = true,
+                            maxLines = 1,
+                        )
+                        Text(
+                            if (e.point) local(e.endsAt) else stringResource(R.string.clash_ev_range, local(e.startsAt), local(e.endsAt)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
         item {
