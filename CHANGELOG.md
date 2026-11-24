@@ -6,6 +6,23 @@ All notable changes to this project are listed here. The format is based on [Kee
 
 ## [Unreleased]
 
+## [3.0] - 2026-11-24
+
+### Added
+
+- **Gold Pass auto-discount in Road to max & widget:** automatically applies active builder/lab reductions while keeping 0% on Pets and Hero Equipment ores, with a quick toggle to inspect base totals.
+- **Real calendar finish forecast & TH bottleneck:** predicts completion dates factoring in Builder's Apprentice and Lab Assistant, highlighting whether Lab, Heroes, Pets, or Builders are the current bottleneck.
+- **Road to B.O.B (6th Builder) & Attack Essentials:** tracks Builder Base Troop Lv 18, Defense Lv 9, combined BB Heroes Lv 45, and core TH offense upgrades.
+- **Wall Loot Simulator:** estimate how many walls can be upgraded immediately for a chosen loot budget (including Gold Pass discount).
+- **Helper ROI & 10x Potion × Sleep Warning:** shows daily/weekly hours saved, best active target, Goblin benchmark (40 gems = 24h), and warns when a simulated potion finishes during your sleep window.
+- **Pre-sleep reminder, Sync diff summary, `.json` Backup & Restore, and All-Villages Overview Widget (`OverviewWidget`).**
+- **Eco animations & Android Battery Saver mode:** pauses continuous tube wave redraws automatically in Power Save mode or via *Battery saver animations* in Personalization.
+
+### Performance & Fixed
+
+- Virtualized *Road to max* into its own `LazyColumn`, cached 3D plaque/banner/shield geometry with `drawWithCache`, isolated 1-second timer recompositions, moved top-bar/sub-tab transitions to GPU `graphicsLayer`, and fixed `GameIconCache` + *Plan* tab account chip touch handling.
+- Standardized repository links to `Snk-B/Chief-Timer` with case-insensitive APK release URL checks.
+
 ### Added
 
 - Gold Pass reminder on the Timers tab: on Day 4 and Day 8, a Gold Pass player below 15% or 20% gets a dismissible "update your builder boost?" banner (the unlock days are not confirmed against the game).
@@ -100,4 +117,5 @@ First release.
 - Notifications when a builder, the lab or the pet house is free.
 - Settings for boost strength, helper savings, helper interval and builder count.
 
+[3.0]: https://github.com/Snk-B/Chief-Timer/releases/tag/v3.0
 [1.0.2]: https://github.com/Snk-B/Chief-Timer/releases/tag/v1.0.2

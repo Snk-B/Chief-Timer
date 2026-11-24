@@ -18,6 +18,16 @@ class UpdateCheckTest {
         assertFalse(UpdateCheck.isNewer("2.8", "nightly"))
     }
 
+    @Test fun threeZeroSeriesComparesInOrder() {
+        assertTrue(UpdateCheck.isNewer("3.0", "3.0.1"))
+        assertTrue(UpdateCheck.isNewer("3.0.9", "3.0.10"))
+        assertTrue(UpdateCheck.isNewer("3.0.10", "3.1"))
+        assertTrue(UpdateCheck.isNewer("3.1", "3.1.1"))
+        assertTrue(UpdateCheck.isNewer("3.1.9", "3.1.10"))
+        assertTrue(UpdateCheck.isNewer("3.1.10", "3.2"))
+        assertFalse(UpdateCheck.isNewer("3.0.10", "3.0.9"))
+    }
+
     @Test fun readsTheApkFromTheLatestRelease() {
         val json = """{"tag_name":"CT2.9","draft":false,"body":" Fixes things. ","assets":[
             {"name":"notes.txt","browser_download_url":"https://github.com/Snk-B/Chief-Timer/releases/download/CT2.9/notes.txt","size":10},

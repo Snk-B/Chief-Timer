@@ -11,7 +11,7 @@
 
 <div align="center">
 
-[![Download APK](https://img.shields.io/badge/Download-APK%20v2.4.0-F59E0B?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Snk-B/Chief-Timer/releases/latest)
+[![Download APK](https://img.shields.io/badge/Download-APK%20v3.0-F59E0B?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Snk-B/Chief-Timer/releases/latest)
 [![Android 8.0+](https://img.shields.io/badge/Android-8.0+-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
 [![Town Hall 19](https://img.shields.io/badge/Clash%20of%20Clans-TH19%20Ready-F9A825?style=for-the-badge&logo=supercell&logoColor=white)](#-highlights)
 [![Live Notifications](https://img.shields.io/badge/Android%2016+-Live%20Updates%20%2F%20Now%20Bar-FF6D00?style=for-the-badge&logo=android&logoColor=white)](#-live-notifications--samsung-now-bar)
@@ -107,7 +107,7 @@ Download the latest APK from the **[Releases](https://github.com/Snk-B/Chief-Tim
 
 <div align="center">
 
-### 👉 **[Download ChiefTimer.apk (v2.4.0)](https://github.com/Snk-B/Chief-Timer/releases/latest)** 👈
+### 👉 **[Download ChiefTimer.apk (v3.0)](https://github.com/Snk-B/Chief-Timer/releases/latest)** 👈
 
 </div>
 
@@ -120,12 +120,12 @@ Download the latest APK from the **[Releases](https://github.com/Snk-B/Chief-Tim
 - **Android SDK** (compileSdk 36 / Android 15–17 build tools)
 
 ```bash
-git clone https://github.com/Snk-B/Chief-Timer.git
+git clone https://github.com/Snk-B/Chief-Timer
 cd Chief-Timer
 ./gradlew assembleDebug
 ```
 
-Run the unit test suite (`284` tests):
+Run the unit test suite (`309` tests):
 ```bash
 ./gradlew testDebugUnitTest
 ```

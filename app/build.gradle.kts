@@ -31,8 +31,8 @@ android {
         // GitHub Actions passes the next release number (-PappVersionName=2.4 -PappVersionCode=204, from the
         // newest CT tag), so dev and release builds count upward together. The values below are only used
         // for local builds. Releases are named CT<versionName> (CT2.4 ... CT2.9, CT3.0).
-        versionCode = (findProperty("appVersionCode") as String?)?.toInt() ?: 28
-        versionName = (findProperty("appVersionName") as String?) ?: "2.4.0"
+        versionCode = (findProperty("appVersionCode") as String?)?.toInt() ?: 30000
+        versionName = (findProperty("appVersionName") as String?) ?: "3.0"
         // Shown in crash reports (crash/CrashReporter.kt). R8 is off in every build (see release below).
         manifestPlaceholders["r8"] = "off"
 
