@@ -108,6 +108,11 @@ object SyncRunner {
                         }
                     }
                 }
+                val totalBuilders = (export.derivedTotalBuilders ?: com.snkb.chieftimer.core.AppSettings.DEFAULT_TOTAL_BUILDERS)
+                    .coerceAtLeast(export.regularBuilderJobs.size)
+                val freeBuilders = (totalBuilders - export.regularBuilderJobs.size).coerceAtLeast(0)
+                val readyHelpers = export.helpers.count { it.level > 0 && it.cooldown <= 0L }
+                com.snkb.chieftimer.companion.CompanionPrefs.setQuickStatus(app, freeBuilders, readyHelpers)
                 Result(ok, plainText(outcome.describe(context, Names.get(app))))
             }
         } catch (t: Throwable) {

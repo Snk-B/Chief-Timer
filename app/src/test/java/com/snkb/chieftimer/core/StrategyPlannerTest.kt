@@ -180,15 +180,18 @@ class StrategyPlannerTest {
             ),
             hasBobsHut = false,
         )
-        val progress = StrategyPlanner.bobProgress(export, data, NameMap(mapOf(4000031 to "Baby Dragon", 1000048 to "Mega Tesla")))!!
+        val progress = StrategyPlanner.bobProgress(export.copy(gearUpCount = 2), data, NameMap(mapOf(4000031 to "Baby Dragon", 1000048 to "Mega Tesla")))!!
         assertFalse(progress.unlocked)
         assertTrue(progress.troop.done)
         assertEquals(7, progress.defense.current)
         assertEquals(40, progress.heroes.current)
         assertFalse(progress.heroes.done)
+        assertEquals(2, progress.gearUps.current)
+        assertFalse(progress.gearUps.done)
 
         val unlocked = StrategyPlanner.bobProgress(export.copy(hasBobsHut = true), data, NameMap(emptyMap()))!!
         assertTrue(unlocked.unlocked)
+        assertTrue(unlocked.gearUps.done)
     }
 
     @Test fun offenseChecklistSelectsCoreOffenseAndHeroes() {
@@ -362,5 +365,62 @@ class StrategyPlannerTest {
         assertEquals(1, diff.finished)
         assertEquals(1, diff.levelsGained)
         assertEquals(2, diff.wallsUpgraded)
+    }
+
+    @Test fun alchemistEquipmentAndThReadinessBehaveCorrectly() {
+        val now = 2_000L
+        val export = VillageExport(
+            tag = "#V31",
+            timestamp = now,
+            townHallLevel = 16,
+            builderHutCount = 5,
+            helpers = listOf(Helper(GameIds.HELPER_ALCHEMIST, level = 7, cooldown = 0L)),
+            jobs = emptyList(),
+        )
+        val road = RoadToMax(
+            townHall = 16,
+            buildings = RoadTotals(gold = 50_000_000L, elixir = 10_000_000L),
+            heroes = RoadTotals(darkElixir = 2_800_000L),
+            lab = RoadTotals(),
+            pets = RoadTotals(),
+            walls = RoadTotals(),
+            levels = RoadLevels(),
+            longestHeroSeconds = 0L,
+            items = listOf(
+                RoadItem(1000000, 'b', listOf(10, 10), maxLevel = 12, name = "Army Camp"),
+                RoadItem(9000010, 'e', listOf(15), maxLevel = 27, name = "Giant Gauntlet"),
+                RoadItem(9000000, 'e', listOf(18), maxLevel = 18, name = "Barbarian Puppet"),
+            ),
+            work = RoadWork(
+                buildings = WorkShare(100, 10),
+                defences = WorkShare(100, 5),
+                traps = WorkShare(50, 5),
+                walls = WorkShare(100, 10),
+            ),
+        )
+
+        val alchemist = StrategyPlanner.alchemistAnalysis(export, road, now)!!
+        assertEquals(10_500_000L, alchemist.maxGoldElixir)
+        assertEquals(70_000L, alchemist.maxDarkElixir)
+        assertEquals(10, alchemist.bonusPercent)
+        assertEquals(2, alchemist.suggestedTargetResource) // 2.8M DE / 70k = 40d > Gold 4.7d
+        assertEquals(11_550_000L, alchemist.convertWithBonus(10_500_000L))
+
+        val epicSteps = List(27) { idx ->
+            MaxStep(0, if (idx >= 15) 400L else 100L, 6, 16, glowyOre = if (idx % 3 == 2) 100L else 0L, starryOre = if (idx >= 17 && idx % 3 == 2) 50L else 0L)
+        }
+        val commonSteps = List(18) { MaxStep(0, 100L, 6, 8) }
+        val maxData = MaxData(16, mapOf(9000010 to MaxItem('e', null, epicSteps), 9000000 to MaxItem('e', null, commonSteps)))
+        val equip = StrategyPlanner.equipmentOverview(road, maxData, NameMap(mapOf(9000010 to "Giant Gauntlet", 9000000 to "Barbarian Puppet")))
+        assertEquals(2, equip.items.size)
+        val gauntlet = equip.items.first { it.id == 9000010 }
+        assertTrue(gauntlet.isEpic)
+        assertEquals(18, gauntlet.nextMilestone)
+        assertEquals(1200L, gauntlet.milestoneShiny) // levels 16, 17, 18 -> 3 * 400
+
+        val readiness = StrategyPlanner.thReadinessAnalysis(road)
+        assertEquals(ThReadinessStatus.ALMOST_READY, readiness.status)
+        assertEquals(83, readiness.offensePct) // 20/24
+        assertEquals(93, readiness.defensePct) // 140/150
     }
 }

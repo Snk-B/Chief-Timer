@@ -80,6 +80,7 @@ class CompanionService : Service() {
 
     private var lastQueryEndMs = 0L
     private var lastEventTs = 0L
+    private var lastGameActivityMs = 0L
     private var lastGameComponent: String? = null
     private var cachedKeyboards: Set<String> = emptySet()
     private var cachedKeyboardsAtMs = 0L
@@ -91,7 +92,7 @@ class CompanionService : Service() {
         report(false, LanguageManager.wrap(this).getString(R.string.companion_timeout))
     }
     private val clearBadge = Runnable {
-        badge?.visibility = View.GONE
+        applyIdleBadge()
         status = null
         postNotification()
     }
@@ -104,7 +105,13 @@ class CompanionService : Service() {
             val pm = getSystemService(PowerManager::class.java)
             if (pm?.isInteractive != true) return
             pollForegroundGame()
-            handler.postDelayed(this, POLL_MS)
+            val t = now()
+            if (session.active) lastGameActivityMs = t
+            val delay = CompanionLogic.nextPollDelayMs(
+                active = session.active,
+                sinceLastGameActivityMs = (t - lastGameActivityMs).coerceAtLeast(0L),
+            )
+            handler.postDelayed(this, delay)
         }
     }
 
@@ -208,8 +215,12 @@ class CompanionService : Service() {
         handler.removeCallbacks(pollUsage)
         val pm = getSystemService(PowerManager::class.java)
         if (pm?.isInteractive == true && shouldAutoMonitor()) {
+            lastGameActivityMs = now()
             pollForegroundGame()
-            handler.postDelayed(pollUsage, POLL_MS)
+            handler.postDelayed(
+                pollUsage,
+                CompanionLogic.nextPollDelayMs(session.active, 0L),
+            )
         }
     }
 
@@ -273,10 +284,12 @@ class CompanionService : Service() {
         }
         if (currentActive != session.active) {
             if (currentActive) {
-                session.onGameEntered(now())
+                lastGameActivityMs = now()
+                session.onGameEntered(lastGameActivityMs)
             } else {
                 manualOverride = false
-                session.onGameLeft(now())
+                lastGameActivityMs = now()
+                session.onGameLeft(lastGameActivityMs)
             }
             apply()
         }
@@ -431,6 +444,28 @@ class CompanionService : Service() {
         handler.postDelayed(clearBadge, if (ok) SUCCESS_SHOW_MS else FAIL_SHOW_MS)
     }
 
+    private fun applyIdleBadge() {
+        val b = badge ?: return
+        if (fetching) {
+            b.visibility = View.GONE
+            return
+        }
+        val (freeBuilders, readyHelpers) = CompanionPrefs.quickStatus(this)
+        when {
+            freeBuilders > 0 -> {
+                b.text = freeBuilders.toString()
+                (b.background as? GradientDrawable)?.setColor(0xFF2E9E4F.toInt())
+                b.visibility = View.VISIBLE
+            }
+            readyHelpers > 0 -> {
+                b.text = "✦"
+                (b.background as? GradientDrawable)?.setColor(0xFFCC8A1E.toInt())
+                b.visibility = View.VISIBLE
+            }
+            else -> b.visibility = View.GONE
+        }
+    }
+
     // ---- overlay ------------------------------------------------------------------------------------------------
 
     private inner class CompanionOverlayView(context: Context) : FrameLayout(context) {
@@ -526,6 +561,7 @@ class CompanionService : Service() {
             true
         }.getOrDefault(false)
         if (added) {
+            applyIdleBadge()
             if (fetching) startFetchAnimationOnly()
             CompanionTileService.requestUpdate(this)
         }
@@ -649,7 +685,6 @@ class CompanionService : Service() {
         private const val CHANNEL = "companion"
         private const val NOTIFICATION_ID = 7001
         private const val BUTTON_DP = 56
-        private const val POLL_MS = 2_000L
         private const val KEYBOARDS_CACHE_MS = 5 * 60_000L
         private const val DOUBLE_TAP_MS = 350L
         private const val OVERLAY_FALLBACK_DELAY_MS = 650L

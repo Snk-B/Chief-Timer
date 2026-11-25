@@ -8,6 +8,7 @@ package com.snkb.chieftimer.ui
 import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,8 +55,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -67,6 +74,9 @@ import androidx.compose.ui.unit.sp
 import com.snkb.chieftimer.R
 import com.snkb.chieftimer.core.BobProgress
 import com.snkb.chieftimer.core.Countdown
+import com.snkb.chieftimer.core.EquipmentHero
+import com.snkb.chieftimer.core.EquipmentItemStatus
+import com.snkb.chieftimer.core.EquipmentOverviewSummary
 import com.snkb.chieftimer.core.GoldPassReduction
 import com.snkb.chieftimer.core.MaxData
 import com.snkb.chieftimer.core.OffenseChecklist
@@ -82,13 +92,17 @@ import com.snkb.chieftimer.core.RoadToMaxCalc
 import com.snkb.chieftimer.core.RoadTotals
 import com.snkb.chieftimer.core.SpendRecommendation
 import com.snkb.chieftimer.core.StrategyPlanner
+import com.snkb.chieftimer.core.ThReadinessReport
+import com.snkb.chieftimer.core.ThReadinessStatus
 import com.snkb.chieftimer.core.VillageExport
+import com.snkb.chieftimer.core.VillageHistory
 import com.snkb.chieftimer.core.WallSimResult
 import com.snkb.chieftimer.data.MaxDataStore
 import com.snkb.chieftimer.data.Names
 import com.snkb.chieftimer.data.StateRepository
 import com.snkb.chieftimer.sync.GoldPassStore
 import com.snkb.chieftimer.ui.theme.LocalChiefPalette
+import com.snkb.chieftimer.ui.theme.TavernGold
 import com.snkb.chieftimer.ui.theme.TavernGoldLight
 import com.snkb.chieftimer.ui.theme.TavernGreenLight
 import com.snkb.chieftimer.widget.RoadWidgetUpdater
@@ -144,14 +158,17 @@ private data class RoadScreenData(
     val data: MaxData,
     val spendByResource: Map<Int, List<SpendRecommendation>>,
     val progressDelta: ProgressDelta?,
+    val history: VillageHistory?,
     val bob: BobProgress?,
     val offense: OffenseChecklist,
+    val equipment: EquipmentOverviewSummary,
+    val readiness: ThReadinessReport,
 )
 
 /**
  * "Road to max" styled across all 4 Chief Timer 3D themes: overall Town Hall banner with share card,
- * local evolution summary, filterable/sortable search & item grids, "where to spend now" guide,
- * ore farming forecast inside Equipment details, and 11 individual category cards.
+ * local evolution sparkline, Town Hall readiness & equipment overview, filterable search & item grids,
+ * "where to spend now" guide, ore farming forecast, and 11 category cards.
  */
 @Composable
 internal fun RoadToMaxCard(
@@ -181,7 +198,9 @@ internal fun RoadToMaxCard(
             val delta = history?.delta(daysBack = 30)
             val bob = StrategyPlanner.bobProgress(export, data, names)
             val offense = StrategyPlanner.offenseChecklist(road)
-            RoadScreenData(road, data, spend, delta, bob, offense)
+            val equipment = StrategyPlanner.equipmentOverview(road, data, names)
+            val readiness = StrategyPlanner.thReadinessAnalysis(road)
+            RoadScreenData(road, data, spend, delta, history, bob, offense, equipment, readiness)
         }
     }
 
@@ -279,9 +298,10 @@ internal fun RoadToMaxCard(
         }
         }
 
-        loaded.progressDelta?.let { d ->
-            if (d.overallPctDelta != 0 || d.wallsPctDelta != 0 || d.builderDaysDelta != 0L) {
-                item(key = "road_history") {
+        val entries = loaded.history?.entries.orEmpty()
+        val showHistory = entries.size >= 2 || loaded.progressDelta != null
+        if (showHistory) {
+            item(key = "road_history") {
                 TavernStoneCard(contentPadding = PaddingValues(14.dp)) {
                     ClashOutlinedText(
                         text = stringResource(R.string.road_history_title),
@@ -289,14 +309,30 @@ internal fun RoadToMaxCard(
                         color = pal.accentLight,
                         strokeWidth = 4f,
                     )
-                    val signPct = if (d.overallPctDelta >= 0) "+${d.overallPctDelta}%" else "${d.overallPctDelta}%"
-                    val daysTxt = if (d.builderDaysDelta >= 0) "-${d.builderDaysDelta} $dayUnit" else "+${-d.builderDaysDelta} $dayUnit"
-                    Text(
-                        text = stringResource(R.string.road_history_summary, d.spanDays, signPct, daysTxt),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                    loaded.progressDelta?.let { d ->
+                        val signPct = if (d.overallPctDelta >= 0) "+${d.overallPctDelta}%" else "${d.overallPctDelta}%"
+                        val daysTxt = if (d.builderDaysDelta >= 0) "-${d.builderDaysDelta} $dayUnit" else "+${-d.builderDaysDelta} $dayUnit"
+                        Text(
+                            text = stringResource(R.string.road_history_summary, d.spanDays, signPct, daysTxt),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    if (entries.size >= 2) {
+                        val chartPts = remember(entries) { entries.takeLast(14) }
+                        HistorySparkline(chartPts, pal.accentLight, TavernGreenLight)
+                        val first = chartPts.first()
+                        val last = chartPts.last()
+                        val spanDaysFloat = ((last.at - first.at).coerceAtLeast(3600L)) / 86_400f
+                        val paceHoursPerDay = ((first.builderHoursLeft - last.builderHoursLeft).coerceAtLeast(0L) / spanDaysFloat).toInt()
+                        if (paceHoursPerDay > 0) {
+                            Text(
+                                text = stringResource(R.string.road_pace_daily, paceHoursPerDay, chartPts.size),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -561,6 +597,9 @@ internal fun RoadToMaxCard(
         }
         }
 
+        item(key = "road_readiness") {
+            ThReadinessCard(loaded.readiness)
+        }
         loaded.bob?.let { bob ->
             item(key = "road_bob") { BobTrackerCard(bob) }
         }
@@ -572,6 +611,14 @@ internal fun RoadToMaxCard(
                 filter = gridFilter,
                 onItem = { selectedId = it.id },
             )
+            }
+        }
+        if (loaded.equipment.items.isNotEmpty()) {
+            item(key = "road_equipment_overview") {
+                EquipmentOverviewCard(
+                    overview = loaded.equipment,
+                    onSelectItem = { selectedId = it },
+                )
             }
         }
 
@@ -891,7 +938,7 @@ private fun BobTrackerCard(bob: BobProgress) {
     val pal = LocalChiefPalette.current
     val icon = rememberGameIcon(1000015, null, 40.dp, minPx = 128)
     var open by rememberSaveable { mutableStateOf(!bob.unlocked) }
-    val doneCount = listOf(bob.troop.done, bob.defense.done, bob.heroes.done).count { it }
+    val doneCount = listOf(bob.troop.done, bob.defense.done, bob.heroes.done, bob.gearUps.done).count { it }
 
     TavernStoneCard(
         contentPadding = PaddingValues(0.dp),
@@ -924,7 +971,7 @@ private fun BobTrackerCard(bob: BobProgress) {
                     modifier = Modifier.weight(1f),
                 )
                 ClashOutlinedText(
-                    text = if (bob.unlocked) stringResource(R.string.bob_unlocked) else "$doneCount/3",
+                    text = if (bob.unlocked) stringResource(R.string.bob_unlocked) else "$doneCount/4",
                     fontSize = 14.sp,
                     color = if (bob.unlocked) TavernGreenLight else pal.accentLight,
                     strokeWidth = 4f,
@@ -962,16 +1009,292 @@ private fun BobTrackerCard(bob: BobProgress) {
                             target = bob.heroes.target,
                             done = bob.heroes.done,
                         )
-                        Text(
-                            text = stringResource(R.string.bob_gearup_note),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        BobRequirementRow(
+                            label = stringResource(R.string.bob_gearups),
+                            detail = null,
+                            current = bob.gearUps.current,
+                            target = bob.gearUps.target,
+                            done = bob.gearUps.done,
                         )
+                        if (!bob.gearUps.done) {
+                            Text(
+                                text = stringResource(R.string.bob_gearup_note),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun HistorySparkline(
+    entries: List<com.snkb.chieftimer.core.VillageSnapshot>,
+    overallColor: Color,
+    wallsColor: Color,
+) {
+    val pal = LocalChiefPalette.current
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(pal.barTrackBg)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+    ) {
+        if (entries.size < 2) return@Canvas
+        val minPct = entries.minOf { minOf(it.overallPct, it.wallsPct) }.coerceAtLeast(0)
+        val maxPct = entries.maxOf { maxOf(it.overallPct, it.wallsPct) }.coerceAtLeast(minPct + 1)
+        val span = (maxPct - minPct).toFloat()
+        fun yFor(pct: Int): Float = size.height - ((pct - minPct) / span) * size.height
+
+        val overallPath = Path()
+        val wallsPath = Path()
+        entries.forEachIndexed { idx, s ->
+            val x = (idx.toFloat() / (entries.size - 1)) * size.width
+            val yo = yFor(s.overallPct)
+            val yw = yFor(s.wallsPct)
+            if (idx == 0) {
+                overallPath.moveTo(x, yo)
+                wallsPath.moveTo(x, yw)
+            } else {
+                overallPath.lineTo(x, yo)
+                wallsPath.lineTo(x, yw)
+            }
+        }
+        drawPath(wallsPath, color = wallsColor.copy(alpha = 0.65f), style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(overallPath, color = overallColor, style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        val lastX = size.width
+        drawCircle(overallColor, radius = 3.2.dp.toPx(), center = Offset(lastX, yFor(entries.last().overallPct)))
+    }
+}
+
+@Composable
+private fun ThReadinessCard(report: ThReadinessReport) {
+    val pal = LocalChiefPalette.current
+    val (statusRes, badgeColor) = when (report.status) {
+        ThReadinessStatus.READY -> R.string.road_readiness_ready to TavernGreenLight
+        ThReadinessStatus.ALMOST_READY -> R.string.road_readiness_almost to pal.accentLight
+        ThReadinessStatus.RUSHED_OFFENSE -> R.string.road_readiness_rush_offense to Color(0xFFFF8A80)
+        ThReadinessStatus.RUSHED_DEFENSE -> R.string.road_readiness_rush_defense to TavernGoldLight
+    }
+    var open by rememberSaveable { mutableStateOf(false) }
+
+    TavernStoneCard(contentPadding = PaddingValues(0.dp), modifier = Modifier.wiggleOnTap()) {
+        Column(
+            Modifier.fillMaxWidth().clickable { open = !open }.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                ClashOutlinedText(
+                    text = stringResource(R.string.road_readiness_title),
+                    fontSize = 15.5.sp,
+                    color = pal.accentLight,
+                    strokeWidth = 4f,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${report.overallPct}%",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = badgeColor,
+                    modifier = Modifier.padding(end = 6.dp),
+                )
+                Text(
+                    text = if (open) "▴" else "▾",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = stringResource(statusRes),
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color = badgeColor,
+            )
+            AnimatedVisibility(open) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ReadinessMeterRow(stringResource(R.string.road_readiness_offense), report.offensePct, TavernBarTone.ELIXIR)
+                    ReadinessMeterRow(stringResource(R.string.road_readiness_defense), report.defensePct, TavernBarTone.GREEN)
+                    ReadinessMeterRow(stringResource(R.string.road_readiness_walls), report.wallsPct, TavernBarTone.GOLD)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadinessMeterRow(label: String, pct: Int, tone: TavernBarTone) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White)
+            Text("$pct%", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = TavernGoldLight)
+        }
+        TavernWavyTubeBar(progress = (pct / 100f).coerceIn(0f, 1f), tone = tone)
+    }
+}
+
+@Composable
+private fun EquipmentOverviewCard(
+    overview: EquipmentOverviewSummary,
+    onSelectItem: (Int) -> Unit,
+) {
+    val pal = LocalChiefPalette.current
+    val icon = rememberGameIcon(1000070, null, 40.dp, minPx = 128)
+    var open by rememberSaveable { mutableStateOf(false) }
+    var heroFilter by rememberSaveable { mutableStateOf<EquipmentHero?>(null) }
+    val availableHeroes = remember(overview) {
+        EquipmentHero.entries.filter { h -> overview.items.any { it.hero == h } }
+    }
+    val visibleItems = remember(overview, heroFilter) {
+        val list = if (heroFilter == null) overview.items else overview.items.filter { it.hero == heroFilter }
+        list.take(10)
+    }
+    val totalOres = remember(overview) {
+        RoadTotals(shinyOre = overview.totalShinyLeft, glowyOre = overview.totalGlowyLeft, starryOre = overview.totalStarryLeft)
+    }
+
+    TavernStoneCard(contentPadding = PaddingValues(0.dp), modifier = Modifier.wiggleOnTap()) {
+        Column(
+            Modifier.fillMaxWidth().clickable { open = !open }.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TavernIconFrame(size = 44.dp) {
+                    if (icon != null) {
+                        Image(icon, contentDescription = null, filterQuality = FilterQuality.High, modifier = Modifier.size(34.dp))
+                    } else {
+                        Image(painterResource(R.drawable.road_dark_elixir), contentDescription = null, modifier = Modifier.size(30.dp))
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    ClashOutlinedText(
+                        text = stringResource(R.string.equip_overview_title),
+                        fontSize = 16.5.sp,
+                        color = Color.White,
+                        strokeWidth = 4.5f,
+                    )
+                    Text(
+                        text = stringResource(R.string.equip_overview_subtitle),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    text = if (open) "▴" else "▾",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            AnimatedVisibility(open) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (totalOres.shinyOre + totalOres.glowyOre + totalOres.starryOre > 0L) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            RoadOreChips(totalOres)
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        TavernFilterPill(
+                            label = stringResource(R.string.equip_hero_all),
+                            selected = heroFilter == null,
+                            onClick = { heroFilter = null },
+                        )
+                        availableHeroes.forEach { h ->
+                            TavernFilterPill(
+                                label = stringResource(heroLabelRes(h)),
+                                selected = heroFilter == h,
+                                onClick = { heroFilter = h },
+                            )
+                        }
+                    }
+                    visibleItems.forEach { eq ->
+                        EquipmentOverviewRow(eq = eq, onClick = { onSelectItem(eq.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EquipmentOverviewRow(eq: EquipmentItemStatus, onClick: () -> Unit) {
+    val pal = LocalChiefPalette.current
+    val bmp = rememberGameIcon(eq.id, eq.level, 36.dp)
+    val subText = if (eq.maxed) {
+        stringResource(R.string.equip_maxed_badge)
+    } else {
+        val oreParts = buildList {
+            if (eq.milestoneShiny > 0L) add("${eq.milestoneShiny} S")
+            if (eq.milestoneGlowy > 0L) add("${eq.milestoneGlowy} G")
+            if (eq.milestoneStarry > 0L) add("${eq.milestoneStarry} ★")
+        }.joinToString(" · ")
+        val milestoneText = stringResource(R.string.equip_next_breakpoint, eq.nextMilestone)
+        if (oreParts.isNotEmpty()) "$milestoneText ($oreParts)" else milestoneText
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(pal.barTrackBg)
+            .border(1.dp, if (eq.isEpic && !eq.maxed) TavernGold.copy(alpha = 0.55f) else pal.barTrackRim, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        TavernIconFrame(size = 38.dp) {
+            if (bmp != null) Image(bmp, null, filterQuality = FilterQuality.High, modifier = Modifier.size(30.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = eq.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    text = stringResource(if (eq.isEpic) R.string.equip_rarity_epic else R.string.equip_rarity_common),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                    color = if (eq.isEpic) TavernGoldLight else Color(0xFF90CAF9),
+                )
+            }
+            Text(
+                text = subText,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (eq.maxed) TavernGreenLight else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            text = "${eq.level}/${eq.maxLevel}",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = if (eq.maxed) TavernGreenLight else pal.accentLight,
+        )
+    }
+}
+
+private fun heroLabelRes(hero: EquipmentHero): Int = when (hero) {
+    EquipmentHero.KING -> R.string.equip_hero_king
+    EquipmentHero.QUEEN -> R.string.equip_hero_queen
+    EquipmentHero.PRINCE -> R.string.equip_hero_prince
+    EquipmentHero.WARDEN -> R.string.equip_hero_warden
+    EquipmentHero.CHAMPION -> R.string.equip_hero_champion
+    EquipmentHero.DUKE -> R.string.equip_hero_duke
+    EquipmentHero.OTHER -> R.string.equip_hero_other
 }
 
 @Composable
@@ -1281,7 +1604,9 @@ private fun ItemGrid(
     prefiltered: Boolean = false,
     onItem: (RoadItem) -> Unit,
 ) {
+    val context = LocalContext.current
     val pal = LocalChiefPalette.current
+    val names = remember { Names.get(context) }
     val sorted = remember(items, data, filter, prefiltered) {
         if (prefiltered) items else StrategyPlanner.filterAndSortRoadItems(items, data, filter)
     }
@@ -1323,13 +1648,25 @@ private fun ItemGrid(
                         )
                     }
                     if (item.group == 'c') {
-                        item.name?.let { n ->
+                        val badgeRes = craftedStatBadgeRes(names.name(item.id), item.name)
+                        val badgeText = if (badgeRes != null) {
+                            stringResource(badgeRes)
+                        } else {
+                            val fallback = names.name(item.id).takeUnless { it.startsWith("#") } ?: item.name.orEmpty()
+                            fallback.substringAfterLast(' ').take(4).uppercase()
+                        }
+                        if (badgeText.isNotBlank()) {
                             Text(
-                                text = n.split(' ', '-').mapNotNull { it.firstOrNull() }.take(3).joinToString(""),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                text = badgeText,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.5.sp),
                                 color = pal.accentLight,
                                 maxLines = 1,
-                                modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp, top = 2.dp),
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(3.dp)
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(pal.cardBot.copy(alpha = 0.88f))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp),
                             )
                         }
                     }
@@ -1393,9 +1730,10 @@ private fun ItemSheet(item: RoadItem, data: MaxData, townHall: Int, dayUnit: Str
                         Spacer(Modifier.size(64.dp))
                     }
                 }
+                val sheetNames = remember { Names.get(context) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     ClashOutlinedText(
-                        text = item.name ?: "#${item.id}",
+                        text = craftedItemTitle(item, sheetNames),
                         fontSize = 19.sp,
                         color = Color.White,
                         strokeWidth = 4.8f,
@@ -1624,4 +1962,40 @@ internal fun compact(n: Long): String = when {
     n >= 1_000_000 -> String.format(Locale.US, "%.1fM", n / 1e6)
     n >= 1_000 -> String.format(Locale.US, "%.1fK", n / 1e3)
     else -> n.toString()
+}
+
+private fun craftedParentId(moduleId: Int): Int? = when (moduleId) {
+    in 102000024..102000026 -> 103000008
+    in 102000027..102000029 -> 103000009
+    in 102000030..102000032 -> 103000010
+    in 102000033..102000035 -> 103000011
+    in 102000036..102000038 -> 103000012
+    in 102000039..102000041 -> 103000013
+    else -> null
+}
+
+private fun craftedItemTitle(item: RoadItem, names: com.snkb.chieftimer.core.NameMap): String {
+    if (item.group != 'c') return item.name ?: "#${item.id}"
+    val stat = names.name(item.id).takeUnless { it.startsWith("#") }
+    val parent = craftedParentId(item.id)?.let { names.name(it) }?.takeUnless { it.startsWith("#") }
+    return when {
+        parent != null && stat != null -> "$parent · $stat"
+        stat != null -> stat
+        else -> item.name ?: "#${item.id}"
+    }
+}
+
+private fun craftedStatBadgeRes(localizedName: String, rawName: String?): Int? {
+    val probe = "${localizedName.lowercase()} ${rawName.orEmpty().lowercase()}"
+    return when {
+        "hitpoint" in probe || "vida" in probe -> R.string.crafted_stat_hp
+        "explosion" in probe || "área" in probe || "area" in probe -> R.string.crafted_stat_exp
+        "burst" in probe || "rajada" in probe -> R.string.crafted_stat_burst
+        "cooldown" in probe || "tempo de ataque" in probe -> R.string.crafted_stat_cd
+        "range" in probe || "alcance" in probe -> R.string.crafted_stat_rng
+        "seconds" in probe || "segundos" in probe || "ativo" in probe -> R.string.crafted_stat_dur
+        "poison" in probe || "veneno" in probe -> R.string.crafted_stat_psn
+        "damage" in probe || "dano" in probe -> R.string.crafted_stat_dmg
+        else -> null
+    }
 }

@@ -52,7 +52,6 @@ import com.snkb.chieftimer.sync.GoldPassStore
 import com.snkb.chieftimer.core.GoldPassLogic
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,10 +67,8 @@ import com.snkb.chieftimer.companion.CompanionPrefs
 import com.snkb.chieftimer.companion.CompanionService
 import com.snkb.chieftimer.core.AppSettings
 import com.snkb.chieftimer.core.BoostSettings
-import com.snkb.chieftimer.core.EventAlertPlanner
 import com.snkb.chieftimer.core.GameIds
 import com.snkb.chieftimer.core.VillageExport
-import com.snkb.chieftimer.notify.EventAlerts
 import com.snkb.chieftimer.notify.Notifier
 import com.snkb.chieftimer.ui.theme.LocalChiefPalette
 
@@ -403,60 +400,8 @@ fun LazyListScope.settingsSectionItems(
     }
 
     item(key = "settings_event_alerts") {
-        val context = LocalContext.current
-        val bodyColor = MaterialTheme.colorScheme.onSurfaceVariant
-        val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
         SectionCard(stringResource(R.string.ev_settings_title)) {
-            var evOn by remember { mutableStateOf(EventAlerts.enabled(context)) }
-            var evLead by remember { mutableLongStateOf(EventAlerts.leadSec(context)) }
-            SwitchRow(stringResource(R.string.ev_settings_enable), evOn) { on ->
-                evOn = on
-                EventAlerts.setEnabled(context, on)
-                if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !Notifier.allowed(context)) {
-                    askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            }
-            Text(
-                stringResource(R.string.ev_settings_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = bodyColor,
-            )
-            AnimatedVisibility(visible = evOn) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    EventAlerts.EVENT_IDS.forEach { id ->
-                        var itemOn by remember(id) { mutableStateOf(EventAlerts.eventOn(context, id)) }
-                        SwitchRow(stringResource(eventName(id)), itemOn) { on ->
-                            itemOn = on
-                            EventAlerts.setEventOn(context, id, on)
-                        }
-                    }
-                    Text(
-                        stringResource(R.string.ev_settings_lead),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = bodyColor,
-                    )
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        EventAlertPlanner.LEADS.forEach { sec ->
-                            val labelRes = when {
-                                sec <= 3600L -> R.string.ev_lead_1h
-                                sec <= 6 * 3600L -> R.string.ev_lead_6h
-                                else -> R.string.ev_lead_24h
-                            }
-                            TavernFilterPill(
-                                label = stringResource(labelRes),
-                                selected = evLead == sec,
-                                onClick = {
-                                    evLead = sec
-                                    EventAlerts.setLeadSec(context, sec)
-                                },
-                            )
-                        }
-                    }
-                }
-            }
+            EventAlertsControlsContent()
         }
     }
 

@@ -25,6 +25,8 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.DrawableRes
 import androidx.annotation.IdRes
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.res.ResourcesCompat
 import com.snkb.chieftimer.R
 import com.snkb.chieftimer.core.BoostPill
@@ -930,10 +932,22 @@ class WidgetIcons private constructor(private val context: Context) {
         synchronized(this) {
             remote = null
             cache.evictAll()
+            imageCache.evictAll()
         }
     }
 
-    private val cache = LruCache<String, Bitmap>(160)
+    private val cacheKb = ((Runtime.getRuntime().maxMemory() / 1024L) / 10L).toInt().coerceIn(8 * 1024, 24 * 1024)
+    private val cache = object : LruCache<String, Bitmap>(cacheKb) {
+        override fun sizeOf(key: String, value: Bitmap): Int =
+            (value.allocationByteCount / 1024).coerceAtLeast(1)
+    }
+    private val imageCache = LruCache<String, ImageBitmap>(256)
+
+    private fun toCachedImage(key: String, bmp: Bitmap?): ImageBitmap? {
+        if (bmp == null) return null
+        imageCache.get(key)?.let { return it }
+        return bmp.asImageBitmap().also { imageCache.put(key, it) }
+    }
 
     private fun findFileIn(name: String, set: Set<String>): String? {
         val webp = "$name.webp"
@@ -945,67 +959,120 @@ class WidgetIcons private constructor(private val context: Context) {
 
     private fun findFile(name: String): String? = findFileIn(name, available)
 
-    /** Pure in-memory cache lookup with zero disk/asset I/O; returns null on cache miss or cold index. */
-    fun cachedBitmap(name: String, sizePx: Int): Bitmap? {
+    private fun cachedBitmapKey(name: String): String? {
         val r = remote ?: return null
         val b = bundledCache ?: return null
-        val remoteFile = findFileIn(name, r)
-        val file = if (remoteFile == null) findFileIn(name, b) else null
-        val key = "${file ?: remoteFile ?: return null}@$sizePx"
-        return cache.get(key)
+        return findFileIn(name, r) ?: findFileIn(name, b)
+    }
+
+    private fun cachedLevelKey(id: Int, level: Int?): String? {
+        if (level != null) {
+            for (l in level downTo 1) {
+                cachedBitmapKey("${id}_$l")?.let { return it }
+            }
+        }
+        return cachedBitmapKey(id.toString())
+    }
+
+    private fun cachedTownHallKey(level: Int?): String? {
+        val top = (level ?: return null).coerceIn(1, 40)
+        val files = townHallFiles ?: return null
+        if ("th_$top.webp" in files) return "th_$top"
+        if (top > 19) cachedBitmapKey("1000001")?.let { return it }
+        for (l in (top - 1) downTo 1) {
+            if ("th_$l.webp" in files) return "th_$l"
+        }
+        return null
+    }
+
+    /** Pure in-memory cache lookup with zero disk/asset I/O; returns null on cache miss or cold index. */
+    fun cachedBitmap(name: String, sizePx: Int): Bitmap? {
+        val file = cachedBitmapKey(name) ?: return null
+        return cache.get("$file@$sizePx")
+    }
+
+    /** Pure in-memory [ImageBitmap] lookup for Compose UI, sharing a single wrapper per key. */
+    fun cachedImageBitmap(name: String, sizePx: Int): ImageBitmap? {
+        val file = cachedBitmapKey(name) ?: return null
+        val key = "$file@$sizePx"
+        return imageCache.get(key) ?: toCachedImage(key, cache.get(key))
     }
 
     /** Pure in-memory cache lookup for an item/level icon; returns null on cache miss or cold index. */
     fun cachedBitmapForLevel(id: Int, level: Int?, sizePx: Int): Bitmap? {
-        val r = remote ?: return null
-        val b = bundledCache ?: return null
-        fun knownFile(name: String): String? = findFileIn(name, r) ?: findFileIn(name, b)
-        if (level != null) {
-            for (l in level downTo 1) {
-                val f = knownFile("${id}_$l") ?: continue
-                return cache.get("$f@$sizePx")
-            }
-        }
-        val f = knownFile(id.toString()) ?: return null
-        return cache.get("$f@$sizePx")
+        val file = cachedLevelKey(id, level) ?: return null
+        return cache.get("$file@$sizePx")
+    }
+
+    /** Pure in-memory [ImageBitmap] lookup for an item/level icon. */
+    fun cachedImageBitmapForLevel(id: Int, level: Int?, sizePx: Int): ImageBitmap? {
+        val file = cachedLevelKey(id, level) ?: return null
+        val key = "$file@$sizePx"
+        return imageCache.get(key) ?: toCachedImage(key, cache.get(key))
     }
 
     /** Pure in-memory cache lookup across candidate IDs; returns null if any winning candidate has not been decoded yet. */
     fun cachedFirstBitmapForLevel(ids: List<Int>, level: Int?, sizePx: Int): Bitmap? {
-        val r = remote ?: return null
-        val b = bundledCache ?: return null
-        fun knownFile(name: String): String? = findFileIn(name, r) ?: findFileIn(name, b)
         for (id in ids) {
-            if (level != null) {
-                for (l in level downTo 1) {
-                    val f = knownFile("${id}_$l") ?: continue
-                    return cache.get("$f@$sizePx")
-                }
-            }
-            knownFile(id.toString())?.let { f -> return cache.get("$f@$sizePx") }
+            cachedLevelKey(id, level)?.let { return cache.get("$it@$sizePx") }
+        }
+        return null
+    }
+
+    /** Pure in-memory [ImageBitmap] lookup across candidate IDs. */
+    fun cachedFirstImageBitmapForLevel(ids: List<Int>, level: Int?, sizePx: Int): ImageBitmap? {
+        for (id in ids) {
+            val file = cachedLevelKey(id, level) ?: continue
+            val key = "$file@$sizePx"
+            return imageCache.get(key) ?: toCachedImage(key, cache.get(key))
         }
         return null
     }
 
     /** Pure in-memory cache lookup for a Town Hall image; returns null on cache miss or cold index. */
     fun cachedTownHall(level: Int?, sizePx: Int): Bitmap? {
-        val top = (level ?: return null).coerceIn(1, 40)
-        val files = townHallFiles ?: return null
-        if ("th_$top.webp" in files) {
-            return cache.get("th_$top@$sizePx")
+        val k = cachedTownHallKey(level) ?: return null
+        return cache.get("$k@$sizePx")
+    }
+
+    /** Pure in-memory [ImageBitmap] lookup for Town Hall art. */
+    fun cachedTownHallImage(level: Int?, sizePx: Int): ImageBitmap? {
+        val k = cachedTownHallKey(level) ?: return null
+        val key = "$k@$sizePx"
+        return imageCache.get(key) ?: toCachedImage(key, cache.get(key))
+    }
+
+    private fun decodeScaledBytes(bytes: ByteArray, sizePx: Int, square: Boolean, upscaleToExact: Boolean): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val rawW = bounds.outWidth
+        val rawH = bounds.outHeight
+        if (rawW <= 0 || rawH <= 0) return null
+
+        var sample = 1
+        while ((rawW / (sample * 2)) >= sizePx && (rawH / (sample * 2)) >= sizePx) {
+            sample *= 2
         }
-        if (top > 19) {
-            val r = remote ?: return null
-            val b = bundledCache ?: return null
-            val f = findFileIn("1000001", r) ?: findFileIn("1000001", b)
-            if (f != null) return cache.get("$f@$sizePx")
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        for (l in (top - 1) downTo 1) {
-            if ("th_$l.webp" in files) {
-                return cache.get("th_$l@$sizePx")
-            }
+        val raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) ?: return null
+        val base = if (square) {
+            val sq = squared(raw)
+            if (sq !== raw) raw.recycle()
+            sq
+        } else raw
+
+        val maxSide = maxOf(base.width, base.height)
+        val needScale = if (upscaleToExact) (base.width != sizePx || base.height != sizePx) else (maxSide > sizePx)
+        if (!needScale) return base
+        val scale = sizePx.toFloat() / maxSide
+        val w = (base.width * scale).roundToInt().coerceAtLeast(1)
+        val h = (base.height * scale).roundToInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(base, w, h, true).also {
+            if (it !== base) base.recycle()
         }
-        return null
     }
 
     fun bitmap(name: String, sizePx: Int): Bitmap? {
@@ -1014,21 +1081,20 @@ class WidgetIcons private constructor(private val context: Context) {
         if (file == null && remoteFile == null) return null
         val key = "${file ?: remoteFile}@$sizePx"
         cache.get(key)?.let { return it }
-        val decoded = runCatching {
-            if (file != null) context.assets.open("icons/$file").use { BitmapFactory.decodeStream(it) }
-            else java.io.File(remoteDir, remoteFile!!).inputStream().use { BitmapFactory.decodeStream(it) }
-        }.getOrNull()?.let { if (remoteFile != null) squared(it) else it } ?: return null
-        val scaled = if (decoded.width == sizePx && decoded.height == sizePx) decoded else {
-            val scale = sizePx.toFloat() / maxOf(decoded.width, decoded.height)
-            Bitmap.createScaledBitmap(
-                decoded,
-                (decoded.width * scale).roundToInt().coerceAtLeast(1),
-                (decoded.height * scale).roundToInt().coerceAtLeast(1),
-                true,
-            ).also { if (it !== decoded) decoded.recycle() }
-        }
+        val bytes = runCatching {
+            if (file != null) context.assets.open("icons/$file").use { it.readBytes() }
+            else java.io.File(remoteDir, remoteFile!!).readBytes()
+        }.getOrNull() ?: return null
+        val scaled = decodeScaledBytes(bytes, sizePx, square = remoteFile != null, upscaleToExact = true) ?: return null
         cache.put(key, scaled)
         return scaled
+    }
+
+    fun imageBitmap(name: String, sizePx: Int): ImageBitmap? {
+        cachedImageBitmap(name, sizePx)?.let { return it }
+        val bmp = bitmap(name, sizePx) ?: return null
+        val file = findFileIn(name, remoteNames()) ?: findFileIn(name, bundledNames()) ?: return bmp.asImageBitmap()
+        return toCachedImage("$file@$sizePx", bmp)
     }
 
     private fun squared(b: Bitmap): Bitmap {
@@ -1046,41 +1112,40 @@ class WidgetIcons private constructor(private val context: Context) {
         return bitmap(id.toString(), sizePx)
     }
 
+    fun imageBitmapForLevel(id: Int, level: Int?, sizePx: Int): ImageBitmap? {
+        if (level != null) {
+            for (l in level downTo 1) imageBitmap("${id}_$l", sizePx)?.let { return it }
+        }
+        return imageBitmap(id.toString(), sizePx)
+    }
+
     /** High-res 384 px Town Hall art for the app & account sheet (`assets/townhall/th_<level>.webp`), falling back safely. */
     fun townHall(level: Int?, sizePx: Int): Bitmap? {
         val top = (level ?: return null).coerceIn(1, 40)
         val files = townHallNames()
-        if ("th_$top.webp" in files) {
-            val exactKey = "th_$top@$sizePx"
-            cache.get(exactKey)?.let { return it }
-            val exactBundled = runCatching {
-                context.assets.open("townhall/th_$top.webp").use { BitmapFactory.decodeStream(it) }
-            }.getOrNull()
-            if (exactBundled != null) {
-                val scale = sizePx.toFloat() / maxOf(exactBundled.width, exactBundled.height)
-                val out = if (scale >= 1f) exactBundled else Bitmap.createScaledBitmap(
-                    exactBundled, (exactBundled.width * scale).roundToInt().coerceAtLeast(1), (exactBundled.height * scale).roundToInt().coerceAtLeast(1), true,
-                ).also { if (it !== exactBundled) exactBundled.recycle() }
-                cache.put(exactKey, out)
-                return out
-            }
-        }
-        if (top > 19) bitmap("1000001", sizePx)?.let { return it }
-        for (l in (top - 1) downTo 1) {
-            if ("th_$l.webp" !in files) continue
-            val key = "th_$l@$sizePx"
+        fun decodeTownHallAsset(assetLevel: Int): Bitmap? {
+            val fname = "th_$assetLevel.webp"
+            if (fname !in files) return null
+            val key = "th_$assetLevel@$sizePx"
             cache.get(key)?.let { return it }
-            val decoded = runCatching {
-                context.assets.open("townhall/th_$l.webp").use { BitmapFactory.decodeStream(it) }
-            }.getOrNull() ?: continue
-            val scale = sizePx.toFloat() / maxOf(decoded.width, decoded.height)
-            val out = if (scale >= 1f) decoded else Bitmap.createScaledBitmap(
-                decoded, (decoded.width * scale).roundToInt().coerceAtLeast(1), (decoded.height * scale).roundToInt().coerceAtLeast(1), true,
-            ).also { if (it !== decoded) decoded.recycle() }
+            val bytes = runCatching { context.assets.open("townhall/$fname").use { it.readBytes() } }.getOrNull() ?: return null
+            val out = decodeScaledBytes(bytes, sizePx, square = false, upscaleToExact = false) ?: return null
             cache.put(key, out)
             return out
         }
+        decodeTownHallAsset(top)?.let { return it }
+        if (top > 19) bitmap("1000001", sizePx)?.let { return it }
+        for (l in (top - 1) downTo 1) {
+            decodeTownHallAsset(l)?.let { return it }
+        }
         return null
+    }
+
+    fun townHallImage(level: Int?, sizePx: Int): ImageBitmap? {
+        cachedTownHallImage(level, sizePx)?.let { return it }
+        val bmp = townHall(level, sizePx) ?: return null
+        val key = cachedTownHallKey(level)?.let { "$it@$sizePx" } ?: return bmp.asImageBitmap()
+        return toCachedImage(key, bmp)
     }
 
     fun fileFor(ids: List<Int>, level: Int?): String? {

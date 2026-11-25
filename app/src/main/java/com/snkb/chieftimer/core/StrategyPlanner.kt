@@ -192,6 +192,7 @@ data class BobProgress(
     val troop: BobRequirementProgress,
     val defense: BobRequirementProgress,
     val heroes: BobRequirementProgress,
+    val gearUps: BobRequirementProgress = BobRequirementProgress(0, 3),
 )
 
 data class OffenseChecklist(
@@ -206,6 +207,58 @@ data class HelperRoiInfo(
     val hoursSavedPerWeek: Int,
     val bestJobName: String?,
     val bestJobSavedHours: Int,
+)
+
+data class AlchemistPlan(
+    val level: Int,
+    val readyInSec: Long,
+    val maxGoldElixir: Long,
+    val maxDarkElixir: Long,
+    val bonusPercent: Int,
+    val suggestedTargetResource: Int, // 0 Gold, 1 Elixir, 2 Dark Elixir
+    val goldLeft: Long,
+    val elixirLeft: Long,
+    val darkLeft: Long,
+) {
+    val isReady: Boolean get() = readyInSec <= 0L
+    fun convertWithBonus(input: Long): Long = Math.round(input.coerceAtLeast(0L) * (100 + bonusPercent) / 100.0)
+}
+
+enum class EquipmentHero { KING, QUEEN, PRINCE, WARDEN, CHAMPION, DUKE, OTHER }
+
+data class EquipmentItemStatus(
+    val id: Int,
+    val name: String,
+    val hero: EquipmentHero,
+    val level: Int,
+    val maxLevel: Int,
+    val isEpic: Boolean,
+    val nextMilestone: Int,
+    val milestoneShiny: Long,
+    val milestoneGlowy: Long,
+    val milestoneStarry: Long,
+    val remainingShiny: Long,
+    val remainingGlowy: Long,
+    val remainingStarry: Long,
+) {
+    val maxed: Boolean get() = level >= maxLevel
+}
+
+data class EquipmentOverviewSummary(
+    val items: List<EquipmentItemStatus>,
+    val totalShinyLeft: Long,
+    val totalGlowyLeft: Long,
+    val totalStarryLeft: Long,
+)
+
+enum class ThReadinessStatus { READY, ALMOST_READY, RUSHED_OFFENSE, RUSHED_DEFENSE }
+
+data class ThReadinessReport(
+    val status: ThReadinessStatus,
+    val offensePct: Int,
+    val defensePct: Int,
+    val wallsPct: Int,
+    val overallPct: Int,
 )
 
 object StrategyPlanner {
@@ -473,6 +526,7 @@ object StrategyPlanner {
                 troop = BobRequirementProgress(18, 18),
                 defense = BobRequirementProgress(9, 9),
                 heroes = BobRequirementProgress(45, 45),
+                gearUps = BobRequirementProgress(3, 3),
             )
         }
         if (Bedtime.builderHall(export) == null) return null
@@ -503,6 +557,7 @@ object StrategyPlanner {
             troop = BobRequirementProgress(bestTroopLvl.coerceAtMost(18), 18, bestTroopId?.let(names::name)),
             defense = BobRequirementProgress(bestDefLvl.coerceAtMost(9), 9, bestDefId?.let(names::name)),
             heroes = BobRequirementProgress(heroSum.coerceAtMost(45), 45),
+            gearUps = BobRequirementProgress(export.gearUpCount.coerceIn(0, 3), 3),
         )
     }
 
@@ -654,6 +709,161 @@ object StrategyPlanner {
             spentCost = spent,
             wallsLeftAfter = (totalLeft - upgraded).coerceAtLeast(0),
             unupgradedTotal = totalLeft,
+        )
+    }
+
+    private val ALCHEMIST_TIERS = listOf(
+        Triple(1_500_000L, 10_000L, 1),
+        Triple(2_250_000L, 15_000L, 2),
+        Triple(3_000_000L, 20_000L, 4),
+        Triple(4_500_000L, 30_000L, 5),
+        Triple(6_000_000L, 40_000L, 7),
+        Triple(7_500_000L, 50_000L, 9),
+        Triple(10_500_000L, 70_000L, 10),
+    )
+
+    private val EQUIPMENT_HERO_MAP = mapOf(
+        // Barbarian King
+        90000000 to EquipmentHero.KING,
+        90000001 to EquipmentHero.KING,
+        90000008 to EquipmentHero.KING,
+        90000010 to EquipmentHero.KING,
+        90000011 to EquipmentHero.KING,
+        90000014 to EquipmentHero.KING,
+        90000032 to EquipmentHero.KING,
+        90000051 to EquipmentHero.KING,
+        // Archer Queen
+        90000002 to EquipmentHero.QUEEN,
+        90000003 to EquipmentHero.QUEEN,
+        90000015 to EquipmentHero.QUEEN,
+        90000016 to EquipmentHero.QUEEN,
+        90000017 to EquipmentHero.QUEEN,
+        90000020 to EquipmentHero.QUEEN,
+        90000039 to EquipmentHero.QUEEN,
+        90000048 to EquipmentHero.QUEEN,
+        // Grand Warden
+        90000004 to EquipmentHero.WARDEN,
+        90000005 to EquipmentHero.WARDEN,
+        90000019 to EquipmentHero.WARDEN,
+        90000022 to EquipmentHero.WARDEN,
+        90000024 to EquipmentHero.WARDEN,
+        90000034 to EquipmentHero.WARDEN,
+        90000041 to EquipmentHero.WARDEN,
+        // Royal Champion
+        90000006 to EquipmentHero.CHAMPION,
+        90000007 to EquipmentHero.CHAMPION,
+        90000009 to EquipmentHero.CHAMPION,
+        90000012 to EquipmentHero.CHAMPION,
+        90000013 to EquipmentHero.CHAMPION,
+        90000040 to EquipmentHero.CHAMPION,
+        90000050 to EquipmentHero.CHAMPION,
+        // Minion Prince
+        90000035 to EquipmentHero.PRINCE,
+        90000042 to EquipmentHero.PRINCE,
+        90000043 to EquipmentHero.PRINCE,
+        90000044 to EquipmentHero.PRINCE,
+        90000047 to EquipmentHero.PRINCE,
+        90000049 to EquipmentHero.PRINCE,
+        90000061 to EquipmentHero.PRINCE,
+        // Dragon Duke
+        90000052 to EquipmentHero.DUKE,
+        90000053 to EquipmentHero.DUKE,
+        90000056 to EquipmentHero.DUKE,
+        90000057 to EquipmentHero.DUKE,
+        90000059 to EquipmentHero.DUKE,
+        90000060 to EquipmentHero.DUKE,
+    )
+
+    /** Analyzes Alchemist daily conversion capacity and highest resource demand on Road to max. */
+    fun alchemistAnalysis(export: VillageExport?, road: RoadToMax?, now: Long): AlchemistPlan? {
+        val helper = export?.helper(GameIds.HELPER_ALCHEMIST)?.takeIf { it.level > 0 } ?: return null
+        val tier = ALCHEMIST_TIERS[(helper.level - 1).coerceIn(0, ALCHEMIST_TIERS.lastIndex)]
+        val timed = if (road != null) road.builderWork + road.lab + road.pets else RoadTotals()
+        val goldDays = timed.gold.toDouble() / tier.first.coerceAtLeast(1L)
+        val elixirDays = timed.elixir.toDouble() / tier.first.coerceAtLeast(1L)
+        val darkDays = timed.darkElixir.toDouble() / tier.second.coerceAtLeast(1L)
+        val suggested = when {
+            darkDays >= goldDays && darkDays >= elixirDays && timed.darkElixir > 0L -> 2
+            elixirDays >= goldDays && timed.elixir > 0L -> 1
+            else -> 0
+        }
+        val readyAt = export.timestamp + helper.cooldown.coerceAtLeast(0L)
+        return AlchemistPlan(
+            level = helper.level,
+            readyInSec = (readyAt - now).coerceAtLeast(0L),
+            maxGoldElixir = tier.first,
+            maxDarkElixir = tier.second,
+            bonusPercent = tier.third,
+            suggestedTargetResource = suggested,
+            goldLeft = timed.gold,
+            elixirLeft = timed.elixir,
+            darkLeft = timed.darkElixir,
+        )
+    }
+
+    /** Builds a filterable Hero Equipment & Ores summary with next +3 breakpoints. */
+    fun equipmentOverview(road: RoadToMax, data: MaxData, names: NameMap): EquipmentOverviewSummary {
+        var totalShiny = 0L
+        var totalGlowy = 0L
+        var totalStarry = 0L
+        val out = road.items.filter { it.group == 'e' }.map { item ->
+            val maxItem = data.items[item.id]
+            val steps = maxItem?.steps.orEmpty()
+            val cur = item.lowest.coerceAtLeast(1)
+            val cap = item.maxLevel
+            val isEpic = steps.size > 18
+            val nextMilestone = (((cur / 3) + 1) * 3).coerceAtMost(cap)
+            var mShiny = 0L; var mGlowy = 0L; var mStarry = 0L
+            var tShiny = 0L; var tGlowy = 0L; var tStarry = 0L
+            for (i in cur until cap) {
+                val st = steps.getOrNull(i) ?: continue
+                val sh = if (st.resource == 6) st.cost else 0L
+                tShiny += sh; tGlowy += st.glowyOre; tStarry += st.starryOre
+                if (i < nextMilestone) {
+                    mShiny += sh; mGlowy += st.glowyOre; mStarry += st.starryOre
+                }
+            }
+            totalShiny += tShiny; totalGlowy += tGlowy; totalStarry += tStarry
+            val resolvedName = names.name(item.id).let { localized ->
+                if (localized.startsWith("#") && !item.name.isNullOrBlank()) item.name else localized
+            }
+            EquipmentItemStatus(
+                id = item.id,
+                name = resolvedName,
+                hero = EQUIPMENT_HERO_MAP[item.id] ?: EquipmentHero.OTHER,
+                level = cur,
+                maxLevel = cap,
+                isEpic = isEpic,
+                nextMilestone = nextMilestone,
+                milestoneShiny = mShiny,
+                milestoneGlowy = mGlowy,
+                milestoneStarry = mStarry,
+                remainingShiny = tShiny,
+                remainingGlowy = tGlowy,
+                remainingStarry = tStarry,
+            )
+        }.sortedWith(compareBy<EquipmentItemStatus> { it.maxed }.thenByDescending { it.isEpic }.thenBy { it.level }.thenBy { it.id })
+        return EquipmentOverviewSummary(out, totalShiny, totalGlowy, totalStarry)
+    }
+
+    /** Evaluates Town Hall upgrade readiness comparing offense & heroes against defenses and walls. */
+    fun thReadinessAnalysis(road: RoadToMax): ThReadinessReport {
+        val offenseDone = offenseChecklist(road).share.done ?: 1.0
+        val defenseDone = (road.work.defences + road.work.traps).done ?: 1.0
+        val wallsDone = road.work.walls.done ?: 1.0
+        val overallDone = road.work.overall ?: 1.0
+        val status = when {
+            offenseDone < 0.75 -> ThReadinessStatus.RUSHED_OFFENSE
+            overallDone >= 0.90 && offenseDone >= 0.90 -> ThReadinessStatus.READY
+            defenseDone < 0.65 && offenseDone >= 0.80 -> ThReadinessStatus.RUSHED_DEFENSE
+            else -> ThReadinessStatus.ALMOST_READY
+        }
+        return ThReadinessReport(
+            status = status,
+            offensePct = (offenseDone * 100).toInt().coerceIn(0, 100),
+            defensePct = (defenseDone * 100).toInt().coerceIn(0, 100),
+            wallsPct = (wallsDone * 100).toInt().coerceIn(0, 100),
+            overallPct = (overallDone * 100).toInt().coerceIn(0, 100),
         )
     }
 }

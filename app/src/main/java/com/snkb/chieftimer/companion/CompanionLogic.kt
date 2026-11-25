@@ -25,4 +25,15 @@ object CompanionLogic {
         if (className != null && className.startsWith("android.")) return current
         return false
     }
+
+    /**
+     * Adaptive polling interval for [CompanionService] to save battery when the user has not
+     * opened Clash of Clans recently.
+     */
+    fun nextPollDelayMs(active: Boolean, sinceLastGameActivityMs: Long): Long = when {
+        active -> 1_500L
+        sinceLastGameActivityMs < 60_000L -> 2_000L
+        sinceLastGameActivityMs < 5 * 60_000L -> 5_000L
+        else -> 10_000L
+    }
 }

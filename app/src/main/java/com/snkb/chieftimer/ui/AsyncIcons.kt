@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -27,13 +26,13 @@ internal fun rememberGameIcon(id: Int?, level: Int?, sizeDp: Dp, minPx: Int = 0)
     val version = MaxDataStore.version
     val sizePx = maxOf(with(density) { sizeDp.roundToPx() }, minPx).coerceAtLeast(1)
     var bitmap by remember(id, level, sizePx, version) {
-        val hit = id?.let { WidgetIcons.get(context).cachedBitmapForLevel(it, level, sizePx)?.asImageBitmap() }
+        val hit = id?.let { WidgetIcons.get(context).cachedImageBitmapForLevel(it, level, sizePx) }
         mutableStateOf(hit)
     }
     if (id != null && bitmap == null) {
         LaunchedEffect(id, level, sizePx, version) {
             val loaded = withContext(Dispatchers.IO) {
-                WidgetIcons.get(context).bitmapForLevel(id, level, sizePx)?.asImageBitmap()
+                WidgetIcons.get(context).imageBitmapForLevel(id, level, sizePx)
             }
             if (loaded != null) bitmap = loaded
         }
@@ -53,7 +52,7 @@ internal fun rememberFirstGameIcon(ids: List<Int>, level: Int?, sizeDp: Dp, minP
     val sizePx = maxOf(with(density) { sizeDp.roundToPx() }, minPx).coerceAtLeast(1)
     var bitmap by remember(ids, level, sizePx, version) {
         val hit = if (ids.isEmpty()) null else {
-            WidgetIcons.get(context).cachedFirstBitmapForLevel(ids, level, sizePx)?.asImageBitmap()
+            WidgetIcons.get(context).cachedFirstImageBitmapForLevel(ids, level, sizePx)
         }
         mutableStateOf(hit)
     }
@@ -61,7 +60,7 @@ internal fun rememberFirstGameIcon(ids: List<Int>, level: Int?, sizeDp: Dp, minP
         LaunchedEffect(ids, level, sizePx, version) {
             val loaded = withContext(Dispatchers.IO) {
                 val icons = WidgetIcons.get(context)
-                ids.firstNotNullOfOrNull { icons.bitmapForLevel(it, level, sizePx) }?.asImageBitmap()
+                ids.firstNotNullOfOrNull { icons.imageBitmapForLevel(it, level, sizePx) }
             }
             if (loaded != null) bitmap = loaded
         }
@@ -80,12 +79,12 @@ internal fun rememberNamedGameIcon(name: String, sizeDp: Dp, enabled: Boolean = 
     val version = MaxDataStore.version
     val sizePx = with(density) { sizeDp.roundToPx() }.coerceAtLeast(1)
     var bitmap by remember(name, sizePx, version) {
-        mutableStateOf(WidgetIcons.get(context).cachedBitmap(name, sizePx)?.asImageBitmap())
+        mutableStateOf(WidgetIcons.get(context).cachedImageBitmap(name, sizePx))
     }
     if (bitmap == null) {
         LaunchedEffect(name, sizePx, version) {
             val loaded = withContext(Dispatchers.IO) {
-                WidgetIcons.get(context).bitmap(name, sizePx)?.asImageBitmap()
+                WidgetIcons.get(context).imageBitmap(name, sizePx)
             }
             if (loaded != null) bitmap = loaded
         }
@@ -103,12 +102,12 @@ internal fun rememberTownHallIcon(level: Int?, sizeDp: Dp, minPx: Int = 0): Imag
     val version = MaxDataStore.version
     val sizePx = maxOf(with(density) { sizeDp.roundToPx() }, minPx).coerceAtLeast(1)
     var bitmap by remember(level, sizePx, version) {
-        mutableStateOf(WidgetIcons.get(context).cachedTownHall(level, sizePx)?.asImageBitmap())
+        mutableStateOf(WidgetIcons.get(context).cachedTownHallImage(level, sizePx))
     }
     if (level != null && bitmap == null) {
         LaunchedEffect(level, sizePx, version) {
             val loaded = withContext(Dispatchers.IO) {
-                WidgetIcons.get(context).townHall(level, sizePx)?.asImageBitmap()
+                WidgetIcons.get(context).townHallImage(level, sizePx)
             }
             if (loaded != null) bitmap = loaded
         }

@@ -1,22 +1,34 @@
 package com.snkb.chieftimer.ui
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -25,9 +37,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.snkb.chieftimer.R
 import com.snkb.chieftimer.core.Bedtime
+import com.snkb.chieftimer.core.EventAlertPlanner
 import com.snkb.chieftimer.core.GameEvents
 import com.snkb.chieftimer.data.MaxDataStore
 import com.snkb.chieftimer.notify.EventAlerts
+import com.snkb.chieftimer.notify.Notifier
+import com.snkb.chieftimer.ui.theme.LocalChiefPalette
 import com.snkb.chieftimer.ui.theme.TavernGold
 import com.snkb.chieftimer.ui.theme.TavernGoldLight
 import com.snkb.chieftimer.ui.theme.TavernGreenLight
@@ -126,6 +141,43 @@ internal fun EventsPage(now: Long) {
                 }
             }
         }
+        item(key = "events_alerts_card") {
+            val pal = LocalChiefPalette.current
+            var alertsOpen by rememberSaveable { mutableStateOf(false) }
+            var masterOn by remember { mutableStateOf(EventAlerts.enabled(context)) }
+            val activeCount = if (masterOn) EventAlerts.EVENT_IDS.count { EventAlerts.eventOn(context, it) } else 0
+            TavernStoneCard(contentPadding = PaddingValues(0.dp), modifier = Modifier.wiggleOnTap()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { alertsOpen = !alertsOpen }
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        ClashOutlinedText(
+                            text = if (masterOn) {
+                                stringResource(R.string.clash_ev_alerts_card, activeCount, EventAlerts.EVENT_IDS.size)
+                            } else {
+                                stringResource(R.string.clash_ev_alerts_disabled)
+                            },
+                            fontSize = 15.sp,
+                            color = if (masterOn && activeCount > 0) pal.accentLight else MaterialTheme.colorScheme.onSurfaceVariant,
+                            strokeWidth = 4f,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = if (alertsOpen) "▴" else "▾",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    AnimatedVisibility(alertsOpen) {
+                        EventAlertsControlsContent(onMasterChanged = { masterOn = it })
+                    }
+                }
+            }
+        }
         item {
             TavernStoneCard {
                 Text(
@@ -204,6 +256,68 @@ internal fun eventName(id: String): Int = when (id) {
     GameEvents.CWL_WARS -> R.string.clash_ev_cwl_wars
     GameEvents.SEASON_END -> R.string.clash_ev_season_end
     else -> R.string.clash_ev_league_reset
+}
+
+/** Shared event alert toggles & lead-time pills used in both Clash > Events and Settings. */
+@Composable
+internal fun EventAlertsControlsContent(onMasterChanged: ((Boolean) -> Unit)? = null) {
+    val context = LocalContext.current
+    val bodyColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    var evOn by remember { mutableStateOf(EventAlerts.enabled(context)) }
+    var evLead by remember { mutableLongStateOf(EventAlerts.leadSec(context)) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SwitchRow(stringResource(R.string.ev_settings_enable), evOn) { on ->
+            evOn = on
+            EventAlerts.setEnabled(context, on)
+            onMasterChanged?.invoke(on)
+            if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !Notifier.allowed(context)) {
+                askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        Text(
+            stringResource(R.string.ev_settings_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = bodyColor,
+        )
+        AnimatedVisibility(visible = evOn) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                EventAlerts.EVENT_IDS.forEach { id ->
+                    var itemOn by remember(id) { mutableStateOf(EventAlerts.eventOn(context, id)) }
+                    SwitchRow(stringResource(eventName(id)), itemOn) { on ->
+                        itemOn = on
+                        EventAlerts.setEventOn(context, id, on)
+                    }
+                }
+                Text(
+                    stringResource(R.string.ev_settings_lead),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = bodyColor,
+                )
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    EventAlertPlanner.LEADS.forEach { sec ->
+                        val labelRes = when {
+                            sec <= 3600L -> R.string.ev_lead_1h
+                            sec <= 6 * 3600L -> R.string.ev_lead_6h
+                            else -> R.string.ev_lead_24h
+                        }
+                        TavernFilterPill(
+                            label = stringResource(labelRes),
+                            selected = evLead == sec,
+                            onClick = {
+                                evLead = sec
+                                EventAlerts.setLeadSec(context, sec)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 private sealed interface DataCheck {

@@ -38,20 +38,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.snkb.chieftimer.R
+import com.snkb.chieftimer.core.AlchemistPlan
 import com.snkb.chieftimer.core.AppState
 import com.snkb.chieftimer.core.BookCandidate
 import com.snkb.chieftimer.core.BookKind
 import com.snkb.chieftimer.core.Countdown
 import com.snkb.chieftimer.core.CwlConflict
 import com.snkb.chieftimer.core.GameEvents
+import com.snkb.chieftimer.core.GameIds
 import com.snkb.chieftimer.core.HelperRole
 import com.snkb.chieftimer.core.PotionSlotType
+import com.snkb.chieftimer.core.RoadToMaxCalc
 import com.snkb.chieftimer.core.RowKind
 import com.snkb.chieftimer.core.StrategyPlanner
 import com.snkb.chieftimer.core.TimerEngine
 import com.snkb.chieftimer.core.VillageExport
 import com.snkb.chieftimer.core.WidgetModel
 import com.snkb.chieftimer.core.formatTimestamp
+import com.snkb.chieftimer.data.MaxDataStore
 import com.snkb.chieftimer.data.Names
 import com.snkb.chieftimer.sync.SleepStore
 import com.snkb.chieftimer.ui.theme.LocalChiefPalette
@@ -60,6 +64,7 @@ import com.snkb.chieftimer.ui.theme.TavernGoldLight
 import com.snkb.chieftimer.ui.theme.TavernGreenLight
 import com.snkb.chieftimer.update.ClashKingDatesStore
 import com.snkb.chieftimer.update.EventsStore
+import java.text.NumberFormat
 
 /** Compact status row for the village's Helpers (Apprentice Builder, Lab Assistant, Alchemist) with live recharge timer. */
 @Composable
@@ -233,12 +238,18 @@ internal fun TimerStrategyCard(
                             selected = tab == 2,
                             onClick = { tab = 2 },
                         )
+                        TavernFilterPill(
+                            label = stringResource(R.string.strategy_tab_alchemist),
+                            selected = tab == 3,
+                            onClick = { tab = 3 },
+                        )
                     }
 
                     when (tab) {
                         0 -> BuilderScheduleContent(builderAnalysis, now, dayUnit)
                         1 -> MagicSimulatorContent(export, appState, nowMinute * 60L, names, dayUnit)
-                        else -> CwlConflictsContent(cwlConflicts, dayUnit)
+                        2 -> CwlConflictsContent(cwlConflicts, dayUnit)
+                        else -> AlchemistContent(export, nowMinute * 60L)
                     }
                 }
             }
@@ -352,7 +363,8 @@ private fun MagicSimulatorContent(
     val pal = LocalChiefPalette.current
     var slot by rememberSaveable { mutableStateOf(PotionSlotType.BUILDER) }
     var count by rememberSaveable { mutableIntStateOf(1) }
-    val sleepWindow = remember(context) { SleepStore.get(context) }
+    val sleepVersion = SleepStore.version
+    val sleepWindow = remember(context, sleepVersion) { SleepStore.get(context) }
 
     val sim = remember(export, appState, snapshotNow, slot, count, sleepWindow) {
         StrategyPlanner.simulatePotions(
@@ -637,5 +649,136 @@ internal fun rememberCwlConflicts(
     }
     return remember(export, appState, events, nowMinute) {
         StrategyPlanner.findCwlConflicts(export, TimerEngine(), appState, nowMinute * 60L, events, names)
+    }
+}
+
+@Composable
+private fun AlchemistContent(export: VillageExport?, snapshotNow: Long) {
+    val context = LocalContext.current
+    val pal = LocalChiefPalette.current
+    val dataVersion = MaxDataStore.version
+    val road = remember(export, dataVersion) {
+        export?.let { RoadToMaxCalc.compute(MaxDataStore.get(context), it) }
+    }
+    val plan: AlchemistPlan? = remember(export, road, snapshotNow) {
+        StrategyPlanner.alchemistAnalysis(export, road, snapshotNow)
+    }
+    if (plan == null) {
+        Text(
+            text = stringResource(R.string.alchemist_locked),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    val bmp = rememberGameIcon(GameIds.HELPER_ALCHEMIST, null, 28.dp)
+    val nf = remember { NumberFormat.getIntegerInstance() }
+    var fromRes by rememberSaveable { mutableIntStateOf(if (plan.suggestedTargetResource == 0) 1 else 0) }
+    var toRes by rememberSaveable { mutableIntStateOf(plan.suggestedTargetResource) }
+    var fractionPct by rememberSaveable { mutableIntStateOf(100) }
+    if (fromRes == toRes) toRes = (fromRes + 1) % 3
+
+    fun resLabel(r: Int): Int = when (r) {
+        1 -> R.string.resource_elixir
+        2 -> R.string.resource_dark_elixir
+        else -> R.string.resource_gold
+    }
+
+    val capForTarget = if (toRes == 2) plan.maxDarkElixir else plan.maxGoldElixir
+    val simInput = (capForTarget * fractionPct) / 100L
+    val displayedInput = when {
+        fromRes == 2 && toRes != 2 -> (plan.maxDarkElixir * fractionPct) / 100L
+        fromRes != 2 && toRes == 2 -> (plan.maxGoldElixir * fractionPct) / 100L
+        else -> simInput
+    }
+    val outputAmount = plan.convertWithBonus(simInput)
+    val freeBonus = (outputAmount - simInput).coerceAtLeast(0L)
+    val targetLeft = when (plan.suggestedTargetResource) {
+        1 -> plan.elixirLeft
+        2 -> plan.darkLeft
+        else -> plan.goldLeft
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (bmp != null) Image(bmp, null, filterQuality = FilterQuality.High, modifier = Modifier.size(26.dp))
+            Text(
+                text = stringResource(R.string.alchemist_header, plan.level, plan.bonusPercent),
+                style = MaterialTheme.typography.titleSmall,
+                color = TavernGoldLight,
+            )
+        }
+        Text(
+            text = stringResource(R.string.alchemist_capacity_line, nf.format(plan.maxGoldElixir), nf.format(plan.maxDarkElixir)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (targetLeft > 0L) {
+            Text(
+                text = stringResource(
+                    R.string.alchemist_advice,
+                    stringResource(resLabel(plan.suggestedTargetResource)),
+                    nf.format(targetLeft),
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = pal.accentLight,
+            )
+        }
+        Text(
+            text = stringResource(R.string.alchemist_sim_title),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.alchemist_source_label), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            listOf(0, 1, 2).forEach { r ->
+                TavernFilterPill(
+                    label = stringResource(resLabel(r)),
+                    selected = fromRes == r,
+                    onClick = {
+                        fromRes = r
+                        if (toRes == r) toRes = (r + 1) % 3
+                    },
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.alchemist_target_label), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            listOf(0, 1, 2).filter { it != fromRes }.forEach { r ->
+                TavernFilterPill(
+                    label = stringResource(resLabel(r)),
+                    selected = toRes == r,
+                    onClick = { toRes = r },
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(25, 50, 100).forEach { pct ->
+                TavernFilterPill(
+                    label = "$pct%",
+                    selected = fractionPct == pct,
+                    onClick = { fractionPct = pct },
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(pal.barTrackBg)
+                .border(1.dp, if (plan.isReady) TavernGreenLight.copy(alpha = 0.6f) else pal.barTrackRim, RoundedCornerShape(8.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = stringResource(
+                    R.string.alchemist_result,
+                    "${nf.format(displayedInput)} ${stringResource(resLabel(fromRes))}",
+                    "${nf.format(outputAmount)} ${stringResource(resLabel(toRes))}",
+                    nf.format(freeBonus),
+                ),
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color = if (plan.isReady) TavernGreenLight else Color.White,
+            )
+        }
     }
 }

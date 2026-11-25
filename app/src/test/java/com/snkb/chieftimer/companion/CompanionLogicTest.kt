@@ -1,5 +1,6 @@
 package com.snkb.chieftimer.companion
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,5 +31,13 @@ class CompanionLogicTest {
     fun otherRealActivitiesLeaveTheGame() {
         assertFalse(CompanionLogic.next("com.android.launcher", true, own, keyboards, "com.android.launcher.MainActivity"))
         assertFalse(CompanionLogic.next("com.whatsapp", true, own, keyboards, null))
+    }
+
+    @Test
+    fun adaptivePollDelaySavesBatteryWhenIdle() {
+        assertEquals(1_500L, CompanionLogic.nextPollDelayMs(active = true, sinceLastGameActivityMs = 120_000L))
+        assertEquals(2_000L, CompanionLogic.nextPollDelayMs(active = false, sinceLastGameActivityMs = 15_000L))
+        assertEquals(5_000L, CompanionLogic.nextPollDelayMs(active = false, sinceLastGameActivityMs = 120_000L))
+        assertEquals(10_000L, CompanionLogic.nextPollDelayMs(active = false, sinceLastGameActivityMs = 600_000L))
     }
 }

@@ -98,6 +98,7 @@ object ExportParser {
             .filter { it.int("data") == GameIds.BUILDERS_HUT }
             .sumOf { it.int("cnt") ?: 1 }
         val bobsHut = buildings.objects().any { it.int("data") == GameIds.BOBS_HUT }
+        val gearUps = buildings.objects().count { (it.int("gear_up") ?: 0) > 0 || it.flag("gear_up") }.coerceAtMost(3)
 
         val helpers = root.array("helpers").objects().mapNotNull { h ->
             val id = h.int("data") ?: return@mapNotNull null
@@ -124,6 +125,7 @@ object ExportParser {
                 clockTowerCooldownRemaining = clockTowerCooldown,
                 ownedLevels = ownedLevels(root),
                 upgradingLevels = upgradingLevels(root),
+                gearUpCount = gearUps,
             )
         )
     }

@@ -115,18 +115,29 @@ import com.snkb.chieftimer.core.AccountMeta
 import com.snkb.chieftimer.core.ActiveBoostState
 import com.snkb.chieftimer.core.AppSettings
 import com.snkb.chieftimer.core.AppState
+import com.snkb.chieftimer.core.Countdown
 import com.snkb.chieftimer.core.EventSettings
+import com.snkb.chieftimer.core.RowKind
 import com.snkb.chieftimer.core.SyncLog
 import com.snkb.chieftimer.core.SyncLogEntry
 import com.snkb.chieftimer.core.VillageExport
 import com.snkb.chieftimer.core.WidgetModel
+import com.snkb.chieftimer.core.WidgetModelBuilder
+import com.snkb.chieftimer.data.Names
+import com.snkb.chieftimer.data.StateRepository
+import com.snkb.chieftimer.data.Times
+import com.snkb.chieftimer.data.WidgetTexts
+import com.snkb.chieftimer.sync.GoldPassStore
 import com.snkb.chieftimer.ui.theme.Chief3DPalette
 import com.snkb.chieftimer.ui.theme.ChiefThemeMode
 import com.snkb.chieftimer.ui.theme.LocalChiefPalette
 import com.snkb.chieftimer.ui.theme.TavernGold
 import com.snkb.chieftimer.ui.theme.TavernGoldLight
+import com.snkb.chieftimer.ui.theme.TavernGreenLight
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 private enum class Destination(@StringRes val labelRes: Int, @DrawableRes val tavernIcon: Int) {
@@ -808,6 +819,46 @@ internal fun HeaderAccountChip(
     }
 
     if (sheetOpen) {
+        var overviewOpen by rememberSaveable { mutableStateOf(false) }
+        var summaries by remember { mutableStateOf<Map<String, AccountLiveSummary>>(emptyMap()) }
+        LaunchedEffect(sheetOpen, overviewOpen, accounts) {
+            if (!sheetOpen) return@LaunchedEffect
+            summaries = withContext(Dispatchers.Default) {
+                val repo = StateRepository(context.applicationContext)
+                val names = Names.get(context)
+                val times = Times.get(context)
+                val wtexts = WidgetTexts.get(context)
+                val global = repo.currentSettings()
+                val now = System.currentTimeMillis() / 1000L
+                accounts.associate { acct ->
+                    val st = repo.getAccountState(acct.tag)
+                    val aset = repo.getAccountSettings(acct.tag)
+                    val s = AppSettings(
+                        totalBuildersOverride = aset.totalBuildersOverride,
+                        boosts = aset.boosts,
+                        notificationsEnabled = global.notificationsEnabled,
+                        liveCountdown = global.liveCountdown,
+                        playerName = aset.playerName,
+                    )
+                    val m = WidgetModelBuilder.build(
+                        st, s, names, times, now, acct.tag,
+                        global.effectiveWidgetTheme, wtexts, GoldPassStore.reduction(context, acct.tag),
+                    )
+                    val nextFree = m.builderRows.filter { it.kind == RowKind.RUNNING && !it.goblin }.minOfOrNull { it.remaining }
+                    val labBusy = (listOf(m.labRow) + m.extraLabRows).filter { it.kind == RowKind.RUNNING }.minOfOrNull { it.remaining }
+                    val exp = st.export
+                    val helpersReady = exp?.helpers?.count { h -> h.level > 0 && (exp.timestamp + h.cooldown - now) <= 0L } ?: 0
+                    acct.tag to AccountLiveSummary(
+                        buildersBusy = m.buildersBusy,
+                        buildersTotal = m.buildersTotal,
+                        nextBuilderSec = nextFree,
+                        labSec = labBusy,
+                        helpersReady = helpersReady,
+                    )
+                }
+            }
+        }
+        val dayUnit = stringResource(R.string.time_day_short)
         ModalBottomSheet(
             onDismissRequest = { sheetOpen = false },
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -831,16 +882,76 @@ internal fun HeaderAccountChip(
                         color = TavernGold,
                         strokeWidth = 5f,
                     )
-                    Text(
-                        text = stringResource(R.string.accounts_count, accounts.size),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (accounts.size >= 2) {
+                            TavernFilterPill(
+                                label = stringResource(R.string.accounts_overview_btn),
+                                selected = overviewOpen,
+                                onClick = { overviewOpen = !overviewOpen },
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.accounts_count, accounts.size),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                if (overviewOpen && summaries.isNotEmpty()) {
+                    TavernStoneCard(contentPadding = PaddingValues(12.dp)) {
+                        ClashOutlinedText(
+                            text = stringResource(R.string.accounts_overview_title),
+                            fontSize = 15.5.sp,
+                            color = TavernGoldLight,
+                            strokeWidth = 4f,
+                        )
+                        accounts.forEach { acct ->
+                            val s = summaries[acct.tag] ?: return@forEach
+                            val freeB = s.buildersBusy < s.buildersTotal
+                            val builderStatus = if (freeB) stringResource(R.string.stat_free_now)
+                            else s.nextBuilderSec?.let { stringResource(R.string.accounts_overview_free_in, Countdown.text(it, dayUnit)) } ?: "—"
+                            val labStatus = s.labSec?.let { Countdown.text(it, dayUnit) } ?: stringResource(R.string.stat_free_now)
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        sheetOpen = false
+                                        onSelect(acct.tag)
+                                    }
+                                    .padding(vertical = 5.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${acct.displayName}${acct.townHall?.let { " · CV$it" }.orEmpty()}",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                    )
+                                    Text(
+                                        text = "🔨 ${stringResource(R.string.accounts_overview_builders, s.buildersBusy, s.buildersTotal)} · 🧪 $labStatus" +
+                                            if (s.helpersReady > 0) " · ${stringResource(R.string.accounts_overview_helpers, s.helpersReady)}" else "",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Text(
+                                    text = builderStatus,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (freeB) TavernGreenLight else TavernGoldLight,
+                                )
+                            }
+                        }
+                    }
                 }
 
                 accounts.forEach { acct ->
                     val isCurrent = acct.tag == selectedAccount?.tag
                     val thBmp = rememberTownHallIcon(acct.townHall, 48.dp, minPx = 160)
+                    val summary = summaries[acct.tag]
                     TavernStoneCard(
                         highlighted = isCurrent,
                         contentPadding = PaddingValues(12.dp),
@@ -881,6 +992,7 @@ internal fun HeaderAccountChip(
                                     text = listOfNotNull(
                                         acct.townHall?.let { stringResource(R.string.town_hall, it) },
                                         acct.tag,
+                                        summary?.let { "🔨 ${it.buildersBusy}/${it.buildersTotal}" },
                                     ).joinToString(" \u00B7 "),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1055,6 +1167,14 @@ internal fun HeaderAccountChip(
         )
     }
 }
+
+private data class AccountLiveSummary(
+    val buildersBusy: Int,
+    val buildersTotal: Int,
+    val nextBuilderSec: Long?,
+    val labSec: Long?,
+    val helpersReady: Int,
+)
 
 @Composable
 private fun TavernBottomNavBar(

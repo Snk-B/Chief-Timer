@@ -78,11 +78,25 @@ class ExportParserTest {
             ),
             b.map { Triple(it.dataId, it.currentLevel, it.remainingAtT0) },
         )
-        // Mortar with gear_up is not a job.
+        // Mortar with gear_up is not a job, but gearUpCount reads it.
         assertFalse(export1.jobs.any { it.dataId == 1000013 })
+        assertEquals(1, export1.gearUpCount)
         // No hero or trap is upgrading in this sample.
         assertTrue(b.none { it.source == JobSource.HERO || it.source == JobSource.TRAP })
         assertTrue("Apprentice unlinked in export 1", b.none { it.helperLinked })
+    }
+
+    @Test fun gearUpCountDetectsAllThreeHomeGearUps() {
+        val raw = """
+            {"tag":"#GU","timestamp":1000,"buildings":[
+              {"data":1000001,"lvl":12},
+              {"data":1000008,"lvl":15,"gear_up":1},
+              {"data":1000009,"lvl":15,"gear_up":1},
+              {"data":1000013,"lvl":10,"gear_up":1}
+            ]}
+        """.trimIndent()
+        val parsed = (ExportParser.parse(raw) as ParseResult.Success).export
+        assertEquals(3, parsed.gearUpCount)
     }
 
     @Test fun export1NestedModuleAndNewBuilding() {

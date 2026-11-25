@@ -38,4 +38,17 @@ object CompanionPrefs {
         }
         mode == AppOpsManager.MODE_ALLOWED
     }.getOrDefault(false)
+
+    /** Lightweight cached builder/helper readiness summary shown as an idle pill on the overlay button. */
+    fun setQuickStatus(c: Context, freeBuilders: Int, readyHelpers: Int) {
+        p(c).edit()
+            .putInt("qs_free_builders", freeBuilders.coerceAtLeast(0))
+            .putInt("qs_ready_helpers", readyHelpers.coerceAtLeast(0))
+            .apply()
+    }
+
+    fun quickStatus(c: Context): Pair<Int, Int> {
+        val prefs = p(c)
+        return prefs.getInt("qs_free_builders", 0) to prefs.getInt("qs_ready_helpers", 0)
+    }
 }
