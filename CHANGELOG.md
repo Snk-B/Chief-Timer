@@ -6,6 +6,23 @@ All notable changes to this project are listed here. The format is based on [Kee
 
 ## [Unreleased]
 
+## [3.1] - 2026-11-25
+
+### Added
+
+- **Equipment & Ores Overview:** Hero-filterable tracker in *Road to max* with Common vs. Epic rarity tags, next `+3` milestone ore targets, and total Shiny / Glowy / Starry Ores remaining.
+- **Auto Gear-Up Detection (Road to B.O.B):** Automatically reads Home Village Gear-Up completion (`0/3` → `3/3`) from your village export.
+- **Alchemist Conversion Planner:** Added an interactive **Alchemist** tab in Strategy with daily Gold/Elixir & Dark Elixir limits (`Lv 1–7`), bonus yield, and a `25% / 50% / 100%` resource simulator.
+- **Village Progress Sparkline & TH Readiness:** Visual history chart with daily builder pace and an Offense vs. Defenses & Walls Town Hall Readiness indicator.
+- **In-App All Villages Overview & Clash Event Alerts:** Quick multi-account live summary inside the account switcher and direct event notification toggles inside **Clash → Events**.
+- **Interactive Timeline:** Added Sleep Window shaded bands, dashed CWL war markers, and tap-to-inspect upgrade bar details with cost, exact finish times, and sleep/CWL conflict warnings.
+
+### Fixed & Optimized
+
+- **Readable Crafted Defense Badges:** Replaced cryptic 3-letter initials (`HCH`, `HCD`, `CAP`) with localized attribute labels (`HP`/`VIDA`, `DMG`/`DANO`, `AOE`/`ÁREA`, `PSN`/`VEN.`, etc.) and localized parent titles.
+- **Icon Pipeline & Calendar Speed:** Switched `WidgetIcons` to 2-pass `inSampleSize` decoding + memory-bounded Bitmap LRU + shared `ImageBitmap` caching, stopped recalculating 21-day Bedtime queues every minute, cached bar brushes, and culled off-screen horizontal timeline bars.
+- **Adaptive Companion Polling:** Added idle backoff polling (`1.5s` → `10s`) and free-builder / ready-helper badge indicators in `CompanionService`.
+
 ## [3.0] - 2026-11-24
 
 ### Added
@@ -117,5 +134,6 @@ First release.
 - Notifications when a builder, the lab or the pet house is free.
 - Settings for boost strength, helper savings, helper interval and builder count.
 
+[3.1]: https://github.com/Snk-B/Chief-Timer/releases/tag/v3.1
 [3.0]: https://github.com/Snk-B/Chief-Timer/releases/tag/v3.0
 [1.0.2]: https://github.com/Snk-B/Chief-Timer/releases/tag/v1.0.2
